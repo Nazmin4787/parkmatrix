@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reminder: Your Upcoming Parking Reservation</title>
+</head>
+<body>
+    <h2>Reminder: Your Upcoming Parking Reservation</h2>
+    <p>Hi {{ user.username }},</p>
+    <p>This is a friendly reminder about your upcoming parking reservation:</p>
+    
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+        <p><strong>Booking Details:</strong></p>
+        <ul>
+            <li>Slot Number: {{ booking.parking_slot.slot_number }}</li>
+            <li>Floor: {{ booking.parking_slot.floor }}</li>
+            <li>Start Time: {{ booking.start_time }}</li>
+            <li>End Time: {{ booking.end_time }}</li>
+            {% if booking.vehicle %}
+            <li>Vehicle: {{ booking.vehicle.model }} ({{ booking.vehicle.number_plate }})</li>
+            {% endif %}
+        </ul>
+    </div>
+    
+    <p>We look forward to your arrival!</p>
+    <p>Best regards,<br>ParkSmart Team</p>
+</body>
+</html>

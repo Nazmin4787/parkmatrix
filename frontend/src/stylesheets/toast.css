@@ -1,0 +1,139 @@
+/* Toast Container */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  width: calc(100% - 40px);
+}
+
+/* Toast Notification */
+.toast-notification {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* Toast content */
+.toast-content {
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+/* Toast icon */
+.toast-icon {
+  margin-right: 12px;
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Toast body */
+.toast-body {
+  flex: 1;
+}
+
+/* Toast title */
+.toast-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #212529;
+}
+
+/* Toast message */
+.toast-message {
+  font-size: 14px;
+  color: #495057;
+  overflow-wrap: break-word;
+}
+
+/* Toast close button */
+.toast-close {
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  margin-left: 8px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+/* Toast progress bar */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Priority-specific styles */
+.toast-notification.priority-low .toast-icon {
+  background-color: #e9ecef;
+  color: #6c757d;
+}
+
+.toast-notification.priority-low .toast-progress {
+  background-color: #6c757d;
+}
+
+.toast-notification.priority-medium .toast-icon {
+  background-color: #e3f2fd;
+  color: #0d6efd;
+}
+
+.toast-notification.priority-medium .toast-progress {
+  background-color: #0d6efd;
+}
+
+.toast-notification.priority-high .toast-icon {
+  background-color: #fff3cd;
+  color: #fd7e14;
+}
+
+.toast-notification.priority-high .toast-progress {
+  background-color: #fd7e14;
+}
+
+.toast-notification.priority-urgent .toast-icon {
+  background-color: #f8d7da;
+  color: #dc3545;
+}
+
+.toast-notification.priority-urgent .toast-progress {
+  background-color: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .toast-container {
+    bottom: 20px;
+    top: auto;
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    padding: 0 10px;
+  }
+}

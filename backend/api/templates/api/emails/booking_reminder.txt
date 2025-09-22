@@ -1,0 +1,19 @@
+Reminder: Your Upcoming Parking Reservation
+
+Hi {{ user.username }},
+
+This is a friendly reminder about your upcoming parking reservation:
+
+Booking Details:
+- Slot Number: {{ booking.parking_slot.slot_number }}
+- Floor: {{ booking.parking_slot.floor }}
+- Start Time: {{ booking.start_time }}
+- End Time: {{ booking.end_time }}
+{% if booking.vehicle %}
+- Vehicle: {{ booking.vehicle.model }} ({{ booking.vehicle.number_plate }})
+{% endif %}
+
+We look forward to your arrival!
+
+Best regards,
+ParkSmart Team

@@ -1,0 +1,11 @@
+Subject: Booking Confirmation
+
+Your parking booking has been confirmed.
+
+Booking Details:
+Slot: {{ booking.slot.slot_number }}
+Floor: {{ booking.slot.floor }}
+Start Time: {{ booking.start_time }}
+End Time: {{ booking.end_time }}
+
+Thank you for using our service.

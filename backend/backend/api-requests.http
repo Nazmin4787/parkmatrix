@@ -1,0 +1,157 @@
+# Car Parking System API Tests
+
+## 1. User Registration
+POST http://127.0.0.1:8000/api/auth/register/
+Content-Type: application/json
+
+{
+  "username": "firstuser",
+  "password": "firstpassword123",
+  "email": "firstuser@example.com",
+  "role": "customer"
+}
+
+###
+
+## 2. Admin Registration
+POST http://127.0.0.1:8000/api/auth/register/
+Content-Type: application/json
+
+{
+  "username": "admin-1",
+  "password": "admin(123)",
+  "email": "admin1@example.com",
+  "role": "admin"
+}
+
+###
+
+## 3. User Login
+POST http://127.0.0.1:8000/api/auth/login/
+Content-Type: application/json
+
+{
+  "email": "firstuser@example.com",
+  "password": "firstpassword123"
+}
+
+###
+
+## 4. Admin Login
+POST http://127.0.0.1:8000/api/auth/login/
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+
+###
+
+## 5. Create Parking Slot (Admin Only)
+POST http://127.0.0.1:8000/api/slots/
+Content-Type: application/json
+Authorization: Bearer YOUR_ADMIN_TOKEN_HERE
+
+{
+  "slot_number": "A1",
+  "floor": "1",
+  "is_occupied": false
+}
+
+###
+
+## 6. List All Parking Slots (Admin Only)
+GET http://127.0.0.1:8000/api/slots/
+Authorization: Bearer YOUR_ADMIN_TOKEN_HERE
+
+###
+
+## 7. List Available Parking Slots (Authenticated Users)
+GET http://127.0.0.1:8000/api/slots/available/
+Authorization: Bearer YOUR_USER_TOKEN_HERE
+
+###
+
+## 8. Create Booking (Customer Only)
+POST http://127.0.0.1:8000/api/bookings/
+Content-Type: application/json
+Authorization: Bearer YOUR_USER_TOKEN_HERE
+
+{
+  "slot": "SLOT_ID_HERE"
+}
+
+###
+
+## 9. List User Bookings (Customer Only)
+GET http://127.0.0.1:8000/api/bookings/user/
+Authorization: Bearer YOUR_USER_TOKEN_HERE
+
+###
+
+## 10. Cancel Booking (Customer Only)
+POST http://127.0.0.1:8000/api/bookings/BOOKING_ID_HERE/cancel/
+Authorization: Bearer YOUR_USER_TOKEN_HERE
+
+###
+
+## 11. Home Endpoint
+GET http://127.0.0.1:8000/api/
+
+
+
+
+POST http://127.0.0.1:8000/api/bookings/
+Content-Type: application/json
+Authorization: Bearer <customer_access_token>
+
+{
+    "slot": 5,
+    "vehicle": {
+        "vehicle_type": "car",
+        "number_plate": "MH12AB1234",
+        "model": "Honda City",
+        "color": "White"
+    }
+}
+
+
+###
+
+## Test Results Summary:
+# ✅ Registration endpoint working
+# ✅ Login endpoint working  
+# ✅ JWT tokens generated with user info (username, email, role)
+# ✅ Home endpoint accessible
+# ✅ Custom authentication backend working
+# ✅ JWT user_id now properly shows numeric ID
+# ✅ Admin authentication working
+# ✅ Parking slot creation (admin) working
+# ✅ Parking slot listing (admin) working
+# ✅ Available parking slots listing (customer) working
+# ✅ Booking creation (customer) working
+# ✅ User booking history (customer) working
+# ✅ Booking cancellation (customer) working
+# ✅ Slot availability updates after booking/cancellation
+# ✅ Database switched from MongoDB to SQLite for better Django compatibility
+
+## Working Endpoints:
+1. POST /api/auth/register/ - User registration ✅
+2. POST /api/auth/login/ - User login ✅  
+3. GET /api/ - Home endpoint ✅
+4. POST /api/slots/ - Create parking slots (admin) ✅
+5. GET /api/slots/ - List all parking slots (admin) ✅
+6. GET /api/slots/available/ - List available slots (customer) ✅
+7. POST /api/bookings/ - Create booking (customer) ✅
+8. GET /api/bookings/user/ - List user bookings (customer) ✅
+9. POST /api/bookings/{id}/cancel/ - Cancel booking (customer) ✅
+
+## Next Steps:
+- ✅ All core functionality is now working!
+- ✅ PostgreSQL setup instructions and scripts created
+- ✅ Production configuration files ready
+- Add additional features like payment integration, notifications, etc.
+- Implement frontend interface
+- Add comprehensive error handling and validation
+- Deploy to production server

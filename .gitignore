@@ -1,0 +1,80 @@
+# Python virtual environment
+myenvv/
+test_env/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+venv/
+env/
+*.class
+db.sqlite3
+
+# Node modules
+node_modules/
+frontend/node_modules/
+.vite/
+frontend/.vite/
+.npm/
+
+# Environment files
+.env
+.env.local
+.envv
+.env.development.local
+.env.test.local
+.env.production.local
+frontend/.env
+frontend/.env.*
+
+# Log files
+logs/
+*.log
+
+# Build files
+/build/
+/dist/
+/frontend/build/
+/frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+
+# Misc
+*.bak
+*.tmp
+*.orig
+
+# Local development settings
+local_settings.py
+
+# Ignore test output
+*.coverage
+htmlcov/
+coverage.xml
+
+# Ignore deployment scripts output
+*.ps1~
+
+# Ignore compiled files
+*.so
+*.dll
+*.exe
+
+# Ignore static assets cache
+frontend/public/service-worker.js
+
+# Media and static files (if using cloud storage)
+/media/
+/static/
+/staticfiles/

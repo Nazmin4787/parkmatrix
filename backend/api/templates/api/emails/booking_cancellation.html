@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Your Parking Booking Has Been Cancelled</title>
+</head>
+<body>
+    <h2>Your Parking Booking Has Been Cancelled</h2>
+    <p>Hi {{ user.username }},</p>
+    <p>Your parking reservation has been cancelled successfully.</p>
+    
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+        <p><strong>Cancelled Booking Details:</strong></p>
+        <ul>
+            <li>Slot Number: {{ booking.parking_slot.slot_number }}</li>
+            <li>Floor: {{ booking.parking_slot.floor }}</li>
+            <li>Start Time: {{ booking.start_time }}</li>
+            <li>End Time: {{ booking.end_time }}</li>
+            {% if booking.vehicle %}
+            <li>Vehicle: {{ booking.vehicle.model }} ({{ booking.vehicle.number_plate }})</li>
+            {% endif %}
+        </ul>
+    </div>
+    
+    <p>If you did not request this cancellation, please contact us immediately.</p>
+    <p>Thank you for using our service.</p>
+    <p>Best regards,<br>ParkSmart Team</p>
+</body>
+</html>

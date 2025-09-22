@@ -1,0 +1,19 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 12px 0 20px 0;
+}
+.kpi-card {
+  border-radius: 14px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f6f9ff, #ffffff);
+  border: 1px solid #eef2ff;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+}
+.kpi-label { color: #666; font-size: 13px; }
+.kpi-value { font-size: 28px; font-weight: 800; color: #333; }
+
+.admin-actions { display: flex; gap: 10px; }
+
+

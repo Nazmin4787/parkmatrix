@@ -1,0 +1,236 @@
+import { useEffect, useState } from 'react';
+import { getUserBookings, cancelBooking } from '../../services/bookingslot';
+import BookingTicket from '../../UIcomponents/BookingTicket';
+import Toast from '../../UIcomponents/Toast';
+import Loading from '../../UIcomponents/Loading';
+import '../../stylesheets/components.css';
+import '../../stylesheets/booking-history.css';
+
+// Create a completely new implementation with minimal state
+export default function BookingHistory() {
+  // Essential states only
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [message, setMessage] = useState('');
+  const [tab, setTab] = useState('active');
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+
+  // Simple fetch function with minimal state updates
+  async function fetchBookings() {
+    // Only set loading state when starting to fetch
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log('Fetching bookings...');
+      const response = await getUserBookings();
+      console.log('API Response:', response);
+      
+      // Process response
+      let userBookings = [];
+      if (Array.isArray(response)) {
+        userBookings = response;
+      } else if (response && Array.isArray(response.results)) {
+        userBookings = response.results;
+      } else if (response && Array.isArray(response.bookings)) {
+        userBookings = response.bookings;
+      }
+      
+      console.log('Processed bookings:', userBookings.length);
+      
+      // Save to localStorage as backup
+      localStorage.setItem('userBookings', JSON.stringify(userBookings));
+      
+      // Update state
+      setBookings(userBookings);
+      setLoading(false);
+      
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+      setError('Failed to load bookings. Please try again.');
+      setLoading(false);
+      
+      // Try to load from localStorage if API fails
+      const cachedBookings = localStorage.getItem('userBookings');
+      if (cachedBookings) {
+        try {
+          const parsedBookings = JSON.parse(cachedBookings);
+          setBookings(parsedBookings);
+          setMessage('Showing cached bookings. Pull to refresh.');
+        } catch (e) {
+          console.error('Error parsing cached bookings:', e);
+        }
+      }
+    }
+  }
+
+  // Load bookings on component mount
+  useEffect(() => {
+    fetchBookings();
+  }, []);
+
+  // Handle booking cancellation
+  async function handleCancel(bookingId) {
+    try {
+      setMessage('');
+      await cancelBooking(bookingId);
+      setMessage('Booking cancelled successfully.');
+      // Refresh bookings list
+      fetchBookings();
+    } catch (err) {
+      console.error('Error cancelling booking:', err);
+      setMessage('Failed to cancel booking. Please try again.');
+    }
+  }
+
+  // Handle ticket view
+  function showTicket(booking) {
+    setSelectedTicket(booking);
+    setShowTicketModal(true);
+  }
+
+  function closeTicketModal() {
+    setShowTicketModal(false);
+    setSelectedTicket(null);
+  }
+
+  // Filter bookings based on selected tab
+  const filteredBookings = bookings.filter(booking => {
+    if (tab === 'active') return booking.is_active;
+    if (tab === 'completed') return !booking.is_active;
+    return true; // 'all' tab
+  });
+
+  return (
+    <div className="booking-history-container">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2>My Bookings</h2>
+        <button 
+          onClick={fetchBookings}
+          className="btn-primary"
+          disabled={loading}
+        >
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Tab navigation */}
+      <div className="tab-navigation">
+        <button 
+          className={`tab-button ${tab === 'active' ? 'active' : ''}`} 
+          onClick={() => setTab('active')}
+        >
+          Active
+        </button>
+        <button 
+          className={`tab-button ${tab === 'completed' ? 'active' : ''}`} 
+          onClick={() => setTab('completed')}
+        >
+          Completed
+        </button>
+        <button 
+          className={`tab-button ${tab === 'all' ? 'active' : ''}`} 
+          onClick={() => setTab('all')}
+        >
+          All
+        </button>
+      </div>
+
+      {/* Loading state */}
+      {loading && <Loading />}
+
+      {/* Error state */}
+      {error && !loading && (
+        <div className="error-message">
+          {error}
+          <button onClick={fetchBookings} className="retry-button">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && filteredBookings.length === 0 && (
+        <div className="empty-state">
+          <p>No {tab} bookings found.</p>
+          {tab !== 'all' && (
+            <button onClick={() => setTab('all')} className="view-all-button">
+              View all bookings
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Bookings list */}
+      {!loading && !error && filteredBookings.length > 0 && (
+        <ul className="bookings-list">
+          {filteredBookings.map(booking => (
+            <li key={booking.id} className="booking-item">
+              <div className="booking-details">
+                <h3>Booking #{booking.id}</h3>
+                <p><strong>Slot:</strong> {booking.slot_number || booking.slot}</p>
+                <p>
+                  <strong>Start:</strong> {new Date(booking.start_time).toLocaleString()}
+                </p>
+                {booking.end_time && (
+                  <p><strong>End:</strong> {new Date(booking.end_time).toLocaleString()}</p>
+                )}
+                <p>
+                  <strong>Status:</strong> 
+                  <span className={`status-badge ${booking.is_active ? 'active' : 'completed'}`}>
+                    {booking.is_active ? 'Active' : 'Completed'}
+                  </span>
+                </p>
+                {booking.total_price && (
+                  <p><strong>Amount:</strong> ${booking.total_price}</p>
+                )}
+              </div>
+              
+              <div className="booking-actions">
+                <button 
+                  className="btn-secondary" 
+                  onClick={() => showTicket(booking)}
+                >
+                  View Ticket
+                </button>
+                
+                {booking.is_active && (
+                  <button 
+                    className="btn-danger" 
+                    onClick={() => handleCancel(booking.id)}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Ticket Modal */}
+      {showTicketModal && selectedTicket && (
+        <div className="modal-overlay" onClick={closeTicketModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Booking Ticket</h3>
+              <button className="close-button" onClick={closeTicketModal}>×</button>
+            </div>
+            <BookingTicket booking={selectedTicket} />
+          </div>
+        </div>
+      )}
+
+      {/* Toast message */}
+      {message && (
+        <Toast 
+          message={message} 
+          type={message.includes('success') ? 'success' : 'info'} 
+          onClose={() => setMessage('')} 
+        />
+      )}
+    </div>
+  );
+}

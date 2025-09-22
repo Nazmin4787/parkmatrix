@@ -1,0 +1,36 @@
+.filters-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 16px 0;
+}
+.filters-bar input, .filters-bar select { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; }
+.filters-bar .btn-clear { background: none; border: none; color: #667eea; cursor: pointer; }
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.slot-card {
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid #eee;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  display: grid;
+  gap: 10px;
+}
+.slot-card.available { border-left: 4px solid #00b894; }
+.slot-card.booked { border-left: 4px solid #e17055; opacity: 0.8; }
+.slot-header { display: flex; justify-content: space-between; align-items: center; }
+.slot-code { font-weight: 800; font-size: 18px; }
+.slot-status { padding: 4px 8px; border-radius: 999px; font-size: 12px; }
+.s-available { background: #e8faf6; color: #00b894; }
+.s-booked { background: #fdeeea; color: #e17055; }
+.slot-meta { display: flex; justify-content: space-between; color: #666; }
+.slot-book-btn { padding: 8px 12px; border-radius: 10px; border: none; background: linear-gradient(45deg,#667eea,#764ba2); color: #fff; cursor: pointer; }
+.slot-book-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+

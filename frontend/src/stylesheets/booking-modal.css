@@ -1,0 +1,70 @@
+/* Existing CSS above */
+
+/* New styles for the booking modal */
+.booking-date-time {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.booking-date-time .input-group:last-child {
+  grid-column: span 2;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.input-group label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.input-group input, .input-group select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 16px;
+}
+
+.vehicle-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.vehicle-form input, .vehicle-form select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  width: 100%;
+}
+
+.vehicle-form input[name="number_plate"] {
+  grid-column: span 2;
+  font-weight: 600;
+}
+
+.booking-summary {
+  background-color: #f7fafc;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.booking-summary h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #2d3748;
+}
+
+.booking-summary p {
+  margin: 5px 0;
+  font-size: 14px;
+}

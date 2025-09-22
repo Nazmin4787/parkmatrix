@@ -1,0 +1,62 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.8); /* Slightly more opaque as fallback for Safari */
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.navbar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.brand-mark { font-size: 20px; }
+.brand-name { font-weight: 800; color: #333; }
+
+.nav-links {
+  margin-left: auto;
+  display: flex;
+  gap: 16px;
+}
+
+.nav-links a { color: #333; text-decoration: none; font-weight: 500; }
+.nav-links a:hover { color: #667eea; }
+
+.nav-cta { display: flex; gap: 10px; }
+
+.btn-primary.small {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: linear-gradient(45deg, #ffd700, #ffed4e);
+  color: #333;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-outline {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #667eea;
+  background: transparent;
+  color: #667eea;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-outline:hover { background: #667eea; color: #fff; }
+
+

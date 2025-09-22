@@ -1,0 +1,16 @@
+/**
+ * Browser compatibility fixes
+ * This file adds vendor prefixes and fallbacks for modern CSS features
+ */
+
+/* Backdrop filter vendor prefixes and fallbacks */
+[style*="backdrop-filter"] {
+  backdrop-filter: inherit;
+  -webkit-backdrop-filter: inherit;
+}
+
+.notification-overlay {
+  /* Additional vendor prefixes for backdrop-filter */
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}

@@ -1,0 +1,11 @@
+Subject: Security Alert: New Device Login
+
+Hi {{ user.username }},
+
+We detected a login to your ParkSmart account from a new device.
+
+Time: {{ login_time }}
+IP Address: {{ ip_address }}
+Device: {{ user_agent }}
+
+If this was you, you can safely ignore this email. If you do not recognize this activity, please change your password immediately.

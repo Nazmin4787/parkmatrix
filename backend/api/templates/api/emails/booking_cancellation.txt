@@ -1,0 +1,21 @@
+Your Parking Booking Has Been Cancelled
+
+Hi {{ user.username }},
+
+Your parking reservation has been cancelled successfully.
+
+Cancelled Booking Details:
+- Slot Number: {{ booking.parking_slot.slot_number }}
+- Floor: {{ booking.parking_slot.floor }}
+- Start Time: {{ booking.start_time }}
+- End Time: {{ booking.end_time }}
+{% if booking.vehicle %}
+- Vehicle: {{ booking.vehicle.model }} ({{ booking.vehicle.number_plate }})
+{% endif %}
+
+If you did not request this cancellation, please contact us immediately.
+
+Thank you for using our service.
+
+Best regards,
+ParkSmart Team

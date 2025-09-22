@@ -1,0 +1,10 @@
+Subject: Welcome to ParkSmart!
+
+Welcome, {{ user.username }}!
+
+Thank you for registering with ParkSmart. Your account has been successfully created.
+
+You can now log in and start booking parking spots with ease.
+
+Happy parking!
+The ParkSmart Team

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Alert: New Device Login</title>
+</head>
+<body>
+    <h2>Security Alert: New Device Login</h2>
+    <p>Hi {{ user.username }},</p>
+    <p>We detected a login to your ParkSmart account from a new device.</p>
+    <ul>
+        <li><strong>Time:</strong> {{ login_time }}</li>
+        <li><strong>IP Address:</strong> {{ ip_address }}</li>
+        <li><strong>Device:</strong> {{ user_agent }}</li>
+    </ul>
+    <p>If this was you, you can safely ignore this email. If you do not recognize this activity, please change your password immediately.</p>
+</body>
+</html>

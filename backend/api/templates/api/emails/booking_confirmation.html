@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Booking Confirmation</title>
+</head>
+<body>
+    <h2>Booking Confirmation</h2>
+    <p>Dear {{ user.username }},</p>
+    <p>Your parking booking has been confirmed.</p>
+    <h3>Booking Details:</h3>
+    <ul>
+        <li><strong>Slot:</strong> {{ booking.slot.slot_number }}</li>
+        <li><strong>Floor:</strong> {{ booking.slot.floor }}</li>
+        <li><strong>Start Time:</strong> {{ booking.start_time }}</li>
+        <li><strong>End Time:</strong> {{ booking.end_time }}</li>
+    </ul>
+    <p>Thank you for using our service.</p>
+</body>
+</html>

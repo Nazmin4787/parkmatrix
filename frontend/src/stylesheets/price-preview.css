@@ -1,0 +1,152 @@
+/* ===========================
+   PRICE PREVIEW STYLES
+   =========================== */
+
+.price-preview-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-top: 24px;
+}
+
+.price-preview-header {
+  background: linear-gradient(to right, #3f51b5, #5667ff);
+  color: white;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.price-preview-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.receipt-icon {
+  font-size: 20px;
+}
+
+.price-preview-content {
+  padding: 16px;
+}
+
+.price-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.price-row:last-child {
+  border-bottom: none;
+}
+
+.price-row.base-price {
+  font-weight: 500;
+}
+
+.price-row.discount {
+  color: #38a169;
+}
+
+.price-row.surcharge {
+  color: #e53e3e;
+}
+
+.price-row.total {
+  font-weight: 700;
+  font-size: 18px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 2px solid #e2e8f0;
+}
+
+.discounts-section,
+.surcharges-section {
+  margin: 8px 0;
+  padding: 8px;
+  background-color: #f7fafc;
+  border-radius: 8px;
+}
+
+.price-preview-footer {
+  background-color: #f9fafb;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.guarantee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4a5568;
+}
+
+.check-icon {
+  color: #38a169;
+}
+
+/* Loading state */
+.price-preview-loading,
+.price-preview-placeholder,
+.price-preview-error {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 150px;
+  margin-top: 24px;
+  border: 1px solid #e2e8f0;
+}
+
+.price-preview-loading p,
+.price-preview-placeholder p,
+.price-preview-error p {
+  color: #718096;
+  margin: 12px 0;
+}
+
+.price-preview-placeholder {
+  background-color: #f9fafb;
+  color: #718096;
+}
+
+.price-preview-error {
+  border-color: #fed7d7;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #667eea;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.retry-button {
+  background-color: #4a5568;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  background-color: #2d3748;
+}
