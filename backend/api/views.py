@@ -11,10 +11,11 @@ from .models import ParkingSlot, Booking, ParkingLot, Vehicle, Notification
 from .serializers import (
     UserSerializer, ParkingSlotSerializer, BookingSerializer, ParkingLotSerializer, 
     VehicleSerializer, NotificationSerializer, PricingRateSerializer, 
-    ExtendBookingSerializer, PricePreviewSerializer, LoginSerializer
+    ExtendBookingSerializer, PricePreviewSerializer, LoginSerializer, AdminParkingSlotSerializer
 )
 from rest_framework.views import APIView
 from .permissions import IsAdminUser, IsCustomerUser, IsSecurityUser
+from django.db import models  # Add this import for Q objects
 
 class MarkVehicleLeftView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSecurityUser]
@@ -505,8 +506,44 @@ class AvailableParkingSlotsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Use standard Django ORM filtering with PostgreSQL
-        return ParkingSlot.objects.filter(is_occupied=False)
+        queryset = ParkingSlot.objects.filter(is_occupied=False)
+        
+        # Filter by vehicle type if specified
+        vehicle_type = self.request.query_params.get('vehicle_type', None)
+        if vehicle_type:
+            # Include slots that are specifically for this vehicle type OR slots that accept any vehicle
+            queryset = queryset.filter(
+                models.Q(vehicle_type=vehicle_type) | models.Q(vehicle_type='any')
+            )
+        else:
+            # If no vehicle type specified, filter by user's vehicle types
+            user_vehicle_types = self.request.user.vehicle_set.values_list('vehicle_type', flat=True)
+            if user_vehicle_types:
+                # Show slots compatible with any of user's vehicles
+                q_filter = models.Q(vehicle_type='any')
+                for v_type in user_vehicle_types:
+                    q_filter |= models.Q(vehicle_type=v_type)
+                queryset = queryset.filter(q_filter)
+        
+        return queryset.select_related('parking_lot')
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        # Add summary statistics
+        vehicle_type_counts = {}
+        for slot in queryset:
+            v_type = slot.vehicle_type
+            if v_type not in vehicle_type_counts:
+                vehicle_type_counts[v_type] = 0
+            vehicle_type_counts[v_type] += 1
+        
+        return Response({
+            'slots': serializer.data,
+            'total_available': queryset.count(),
+            'available_by_type': vehicle_type_counts
+        })
 
 from .pricing import calculate_booking_price, calculate_extension_price
 
@@ -528,6 +565,17 @@ class BookingCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsCustomerUser]
 
     def perform_create(self, serializer):
+        # Validate vehicle type compatibility before saving
+        slot = serializer.validated_data['slot']
+        vehicle = serializer.validated_data.get('vehicle')
+        
+        if vehicle and not slot.is_compatible_with_vehicle(vehicle.vehicle_type):
+            raise serializers.ValidationError({
+                'error': f'This slot is designated for {slot.get_vehicle_type_display()} vehicles only. Your vehicle is a {vehicle.get_vehicle_type_display()}.',
+                'slot_vehicle_type': slot.vehicle_type,
+                'your_vehicle_type': vehicle.vehicle_type
+            })
+        
         booking = serializer.save()
         
         # Use our enhanced notification system
@@ -777,26 +825,54 @@ class ParkingLotsByLocationView(generics.ListAPIView):
 def find_nearest_slot(request):
     """
     Finds the nearest unoccupied parking slot to a given point.
-    Expects 'pos_x' and 'pos_y' as query parameters.
+    Expects 'lat' and 'lon' as query parameters.
+    Optionally accepts 'vehicle_type' to filter compatible slots.
     """
     try:
         # Entry point or user's current location from query params
-        current_x = int(request.GET.get('pos_x', 0))
-        current_y = int(request.GET.get('pos_y', 0))
+        current_lat = float(request.GET.get('lat', 0))
+        current_lon = float(request.GET.get('lon', 0))
+        
+        # Also support legacy pos_x and pos_y parameters for backward compatibility
+        if not current_lat and not current_lon:
+            current_lat = float(request.GET.get('pos_x', 0))
+            current_lon = float(request.GET.get('pos_y', 0))
+            
     except (TypeError, ValueError):
-        return JsonResponse({'error': 'Invalid position coordinates'}, status=400)
+        return JsonResponse({'error': 'Invalid position coordinates. Please provide lat and lon parameters.'}, status=400)
 
+    # Get vehicle type filter
+    vehicle_type = request.GET.get('vehicle_type')
+    
+    # Filter available slots
     available_slots = ParkingSlot.objects.filter(is_occupied=False)
+    
+    if vehicle_type:
+        # Filter by vehicle type compatibility
+        available_slots = available_slots.filter(
+            models.Q(vehicle_type=vehicle_type) | models.Q(vehicle_type='any')
+        )
+    elif request.user.is_authenticated:
+        # Filter by user's vehicle types
+        user_vehicle_types = request.user.vehicle_set.values_list('vehicle_type', flat=True)
+        if user_vehicle_types:
+            q_filter = models.Q(vehicle_type='any')
+            for v_type in user_vehicle_types:
+                q_filter |= models.Q(vehicle_type=v_type)
+            available_slots = available_slots.filter(q_filter)
 
     if not available_slots.exists():
-        return JsonResponse({'message': 'No available parking slots at the moment.'}, status=404)
+        return JsonResponse({
+            'message': 'No available parking slots at the moment for your vehicle type.' if vehicle_type else 'No available parking slots at the moment.',
+            'vehicle_type_requested': vehicle_type
+        }, status=404)
 
     nearest_slot = None
     min_distance = float('inf')
 
     for slot in available_slots:
-        # Simple Euclidean distance calculation
-        distance = math.sqrt((slot.pos_x - current_x)**2 + (slot.pos_y - current_y)**2)
+        # Simple Euclidean distance calculation using lat/lon coordinates
+        distance = math.sqrt((slot.pos_x - current_lat)**2 + (slot.pos_y - current_lon)**2)
         if distance < min_distance:
             min_distance = distance
             nearest_slot = slot
@@ -807,13 +883,17 @@ def find_nearest_slot(request):
             'slot_number': nearest_slot.slot_number,
             'floor': nearest_slot.floor,
             'section': nearest_slot.section,
+            'vehicle_type': nearest_slot.vehicle_type,
+            'vehicle_type_display': nearest_slot.get_vehicle_type_display(),
             'pos_x': nearest_slot.pos_x,
             'pos_y': nearest_slot.pos_y,
-            'distance': round(min_distance, 2)
+            'lat': nearest_slot.pos_x,
+            'lon': nearest_slot.pos_y,
+            'distance': round(min_distance, 2),
+            'is_compatible': True  # Since we filtered by compatibility
         }
         return JsonResponse(slot_data)
     else:
-        # This case should ideally not be reached if available_slots.exists() is true
         return JsonResponse({'message': 'Could not determine the nearest slot.'}, status=500)
 
 
@@ -984,3 +1064,77 @@ class SystemNotificationStatusView(APIView):
             "recent_system_notifications": recent_notifications_data,
             "total_users": User.objects.filter(is_active=True).count()
         }, status=status.HTTP_200_OK)
+
+class SlotManagementView(generics.ListCreateAPIView):
+    """Admin view for managing parking slots with vehicle types"""
+    serializer_class = AdminParkingSlotSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    def get_queryset(self):
+        queryset = ParkingSlot.objects.all().select_related('parking_lot')
+        
+        # Filter by parking lot if specified
+        parking_lot_id = self.request.query_params.get('parking_lot')
+        if parking_lot_id:
+            queryset = queryset.filter(parking_lot_id=parking_lot_id)
+            
+        # Filter by vehicle type if specified
+        vehicle_type = self.request.query_params.get('vehicle_type')
+        if vehicle_type:
+            queryset = queryset.filter(vehicle_type=vehicle_type)
+            
+        return queryset
+
+class SlotDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin view for managing individual parking slots"""
+    serializer_class = AdminParkingSlotSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    queryset = ParkingSlot.objects.all().select_related('parking_lot')
+
+class BulkSlotUpdateView(APIView):
+    """Admin view for bulk updating slot vehicle types"""
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    def post(self, request):
+        slot_ids = request.data.get('slot_ids', [])
+        vehicle_type = request.data.get('vehicle_type')
+        
+        if not slot_ids:
+            return Response({'error': 'No slot IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if vehicle_type not in [choice[0] for choice in ParkingSlot.VEHICLE_TYPE_CHOICES]:
+            return Response({'error': 'Invalid vehicle type'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update slots
+        updated_count = ParkingSlot.objects.filter(id__in=slot_ids).update(vehicle_type=vehicle_type)
+        
+        return Response({
+            'message': f'Successfully updated {updated_count} slots to {vehicle_type} type',
+            'updated_count': updated_count
+        })
+
+class SlotStatisticsView(APIView):
+    """Admin view for slot utilization statistics by vehicle type"""
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+    
+    def get(self, request):
+        from django.db.models import Count, Q
+        
+        # Get slot counts by vehicle type
+        slot_stats = ParkingSlot.objects.values('vehicle_type').annotate(
+            total_slots=Count('id'),
+            occupied_slots=Count('id', filter=Q(is_occupied=True)),
+            available_slots=Count('id', filter=Q(is_occupied=False))
+        )
+        
+        # Get booking statistics by vehicle type
+        booking_stats = Booking.objects.filter(is_active=True).values(
+            'vehicle__vehicle_type'
+        ).annotate(
+            active_bookings=Count('id')
+        )
+        
+        return Response({
+            'slot_statistics': list(slot_stats),
+            'booking_statistics': list(booking_stats)
+        })

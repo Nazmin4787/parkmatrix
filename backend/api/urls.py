@@ -8,7 +8,7 @@ from .views import (
     AdminAllBookingsView, AdminCancelBookingView, find_nearest_slot,VehicleListCreateView, VehicleRetrieveUpdateDestroyView,UserVehiclesView, BookingReportView,
     NotificationListView, NotificationMarkAsReadView, NotificationDeleteView, NotificationUnreadCountView,
     MarkAllNotificationsAsReadView, SystemAlertCreateView, MaintenanceAlertCreateView, SystemNotificationStatusView,
-    APIRootView,
+    APIRootView, SlotManagementView, BulkSlotUpdateView, SlotStatisticsView,
 )
 from .notification_public_views import PublicNotificationUnreadCountView
 from .receipt_views import GenerateReceiptView
@@ -42,7 +42,7 @@ urlpatterns = [
     path('admin/bookings/', AdminAllBookingsView.as_view(), name='admin-all-bookings'),
     path('admin/bookings/<int:pk>/cancel/', AdminCancelBookingView.as_view(), name='admin-cancel-booking'),
     path('parking-lots/', views.ParkingLotsByLocationView.as_view(), name='parking-lots-by-location'),
-    path('parking/find_nearest/', find_nearest_slot, name='find-nearest-slot'),
+    path('slots/find-nearest/', find_nearest_slot, name='find-nearest-slot'),
     path('vehicles/list/', UserVehiclesView.as_view(), name='user-vehicles'),
     path('vehicles/', VehicleListCreateView.as_view(), name='vehicle-list-create'),
     path('vehicles/<int:pk>/', VehicleRetrieveUpdateDestroyView.as_view(), name='vehicle-detail'),
@@ -63,4 +63,10 @@ urlpatterns = [
     # Parking search endpoints
     path('parking-lots/nearest/', parking_search.NearestParkingLotsView.as_view(), name='nearest-parking-lots'),
     path('parking-lots/search/', parking_search.search_parking_by_address, name='search-parking-by-address'),
+
+    # Admin slot management
+    path('admin/slots/', views.SlotManagementView.as_view(), name='admin-slot-management'),
+    path('admin/slots/<int:pk>/', views.SlotDetailView.as_view(), name='admin-slot-detail'),
+    path('admin/slots/bulk-update/', views.BulkSlotUpdateView.as_view(), name='bulk-slot-update'),
+    path('admin/slots/statistics/', views.SlotStatisticsView.as_view(), name='slot-statistics'),
 ]

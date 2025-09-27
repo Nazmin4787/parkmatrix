@@ -1,4 +1,3 @@
-
 from rest_framework import serializers
 from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification
 from datetime import timedelta
@@ -41,12 +40,21 @@ class ParkingLotSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ParkingSlotSerializer(serializers.ModelSerializer):
-    id = serializers.CharField(read_only=True)  # Handle MongoDB ObjectId as string
+    id = serializers.CharField(read_only=True)
     parking_lot = ParkingLotSerializer(read_only=True)
+    is_compatible = serializers.SerializerMethodField()
     
     class Meta:
         model = ParkingSlot
-        fields = ['id', 'slot_number', 'floor', 'is_occupied', 'parking_lot']
+        fields = ['id', 'slot_number', 'floor', 'section', 'is_occupied', 'vehicle_type', 'parking_lot', 'is_compatible']
+    
+    def get_is_compatible(self, obj):
+        """Check if slot is compatible with user's vehicle types"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            user_vehicle_types = request.user.vehicle_set.values_list('vehicle_type', flat=True)
+            return any(obj.is_compatible_with_vehicle(v_type) for v_type in user_vehicle_types)
+        return True
 
 class VehicleSerializer(serializers.ModelSerializer):
 
@@ -260,3 +268,11 @@ class NotificationSerializer(serializers.ModelSerializer):
             validated_data['user'] = user
         
         return Notification.objects.create(**validated_data)
+
+# Add a new serializer for admin slot management
+class AdminParkingSlotSerializer(serializers.ModelSerializer):
+    parking_lot_name = serializers.CharField(source='parking_lot.name', read_only=True)
+    
+    class Meta:
+        model = ParkingSlot
+        fields = ['id', 'slot_number', 'floor', 'section', 'vehicle_type', 'is_occupied', 'parking_lot', 'parking_lot_name', 'pos_x', 'pos_y', 'height_cm', 'width_cm', 'length_cm']

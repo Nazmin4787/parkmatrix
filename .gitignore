@@ -1,5 +1,6 @@
 # Python virtual environment
 myenvv/
+parking_env/
 test_env/
 __pycache__/
 *.py[cod]

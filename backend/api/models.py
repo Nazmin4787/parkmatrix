@@ -36,23 +36,48 @@ class ParkingLot(models.Model):
         return self.name
 
 class ParkingSlot(models.Model):
+    VEHICLE_TYPE_CHOICES = [
+        ('car', 'Car'),
+        ('suv', 'SUV'), 
+        ('bike', 'Bike'),
+        ('truck', 'Truck'),
+        ('any', 'Any Vehicle'),  # For flexible slots
+    ]
+    
     parking_lot = models.ForeignKey(ParkingLot, on_delete=models.CASCADE, related_name='slots', null=True)
-    slot_number = models.CharField(max_length=20)  # Remove unique=True if you have it
+    slot_number = models.CharField(max_length=20)
     floor = models.CharField(max_length=5)
     section = models.CharField(max_length=5, default='A')
     pos_x = models.IntegerField(default=0)
     pos_y = models.IntegerField(default=0)
     is_occupied = models.BooleanField(default=False)
+    
+    # Dimension fields (required by database schema)
+    height_cm = models.IntegerField(default=200, help_text="Height of parking slot in centimeters")
+    width_cm = models.IntegerField(default=300, help_text="Width of parking slot in centimeters") 
+    length_cm = models.IntegerField(default=500, help_text="Length of parking slot in centimeters")
+    
+    # New field for vehicle type
+    vehicle_type = models.CharField(
+        max_length=10, 
+        choices=VEHICLE_TYPE_CHOICES, 
+        default='any',
+        help_text="Type of vehicle this slot is designated for"
+    )
 
     def __str__(self):
-        return f"Slot {self.slot_number} (Floor {self.floor} , Section {self.section})"
-
+        return f"Slot {self.slot_number} ({self.vehicle_type}) - Floor {self.floor}, Section {self.section}"
+    
+    def is_compatible_with_vehicle(self, vehicle_type):
+        """Check if this slot can accommodate the given vehicle type"""
+        return self.vehicle_type == 'any' or self.vehicle_type == vehicle_type
 
 class Vehicle(models.Model):
     VEHICLE_TYPE_CHOICES = [
         ('car', 'Car'),
         ('suv', 'SUV'),
         ('bike', 'Bike'),
+        ('truck', 'Truck'),
     ]
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     vehicle_type = models.CharField(max_length=10, choices=VEHICLE_TYPE_CHOICES)
