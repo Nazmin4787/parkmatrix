@@ -19,12 +19,13 @@ export default function SignIn() {
       
       // Check if the backend server is reachable first
       try {
-        await fetch('http://127.0.0.1:8000/api/', { mode: 'no-cors' });
+        await fetch('http://localhost:8000/api/', { mode: 'no-cors' });
       } catch (networkErr) {
         console.error('Backend server unreachable:', networkErr);
         throw new Error('Cannot connect to the server. Please check if the backend is running.');
       }
       
+      console.log('Backend server reachable, attempting login...');
       const data = await loginUser({ email, password });
       console.log('Login response:', data);
       

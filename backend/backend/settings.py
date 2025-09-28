@@ -15,7 +15,7 @@ SECRET_KEY = 'autr)q0^dor8meur0pfa2e_3(qdy60yj3#j*$qn5j5hyf29piz'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'localhost:5173', '127.0.0.1:5173']
 
 # Database
 DATABASES = {
@@ -133,6 +133,18 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:5174',
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # SMTP Email Configuration
 # NOTE: Email sending is disabled. In-app notifications will be used instead.

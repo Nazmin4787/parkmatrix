@@ -54,6 +54,11 @@ http.interceptors.response.use(
         // No refresh token; force signout
         localStorage.removeItem('accessToken');
         localStorage.removeItem('user');
+        localStorage.removeItem('refreshToken');
+        // Redirect to login page if not already there
+        if (window.location.pathname !== '/signin') {
+          window.location.href = '/signin';
+        }
         return Promise.reject(error);
       }
       if (isRefreshing) {

@@ -1,10 +1,34 @@
 import React from 'react';
 import '../stylesheets/slots.css';
 
-export default function SlotCard({ slot, onBook, disabled }) {
+export default function SlotCard({ slot, onBook, disabled, userVehicleType }) {
   const isBooked = Boolean(slot.is_occupied);
+  const isCompatible = !userVehicleType || slot.vehicle_type === 'any' || slot.vehicle_type === userVehicleType;
+  
+  const getVehicleTypeIcon = (type) => {
+    const icons = {
+      'car': '🚗',
+      'suv': '🚙', 
+      'bike': '🏍️',
+      'truck': '🚚',
+      'any': '🅿️'
+    };
+    return icons[type] || '🅿️';
+  };
+
+  const getVehicleTypeLabel = (type) => {
+    const labels = {
+      'car': 'Car',
+      'suv': 'SUV',
+      'bike': 'Bike', 
+      'truck': 'Truck',
+      'any': 'Any Vehicle'
+    };
+    return labels[type] || 'Any Vehicle';
+  };
+
   return (
-    <div className={`slot-card ${isBooked ? 'booked' : 'available'}`}>
+    <div className={`slot-card ${isBooked ? 'booked' : 'available'} ${!isCompatible ? 'incompatible' : ''}`}>
       <div className="slot-header">
         <div className="slot-code">{slot.slot_number}</div>
         <div className={`slot-status ${isBooked ? 's-booked' : 's-available'}`}>
@@ -13,14 +37,23 @@ export default function SlotCard({ slot, onBook, disabled }) {
       </div>
       <div className="slot-meta">
         <div className="slot-floor">Floor {slot.floor}</div>
+        <div className="slot-vehicle-type">
+          <span className="vehicle-icon">{getVehicleTypeIcon(slot.vehicle_type)}</span>
+          <span className="vehicle-label">{getVehicleTypeLabel(slot.vehicle_type)}</span>
+        </div>
         <div className="slot-price">$5/hr</div>
       </div>
+      {!isCompatible && (
+        <div className="compatibility-warning">
+          Not compatible with your vehicle type
+        </div>
+      )}
       <button
         className="slot-book-btn"
         onClick={() => onBook && onBook(slot.id)}
-        disabled={isBooked || disabled}
+        disabled={isBooked || disabled || !isCompatible}
       >
-        {isBooked ? 'Unavailable' : 'Book now'}
+        {isBooked ? 'Unavailable' : !isCompatible ? 'Incompatible' : 'Book now'}
       </button>
     </div>
   );

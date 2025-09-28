@@ -1,21 +1,47 @@
-from rest_framework import generics, permissions, status, serializers
-from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.tokens import RefreshToken
-from .tokens import CustomRefreshToken
-from django.contrib.auth import get_user_model
+import math
+from geopy.distance import geodesic
+
+from django.conf import settings
+from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.db import models
+from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.http import urlsafe_base64_decode
-from django.contrib.auth.tokens import default_token_generator
-from .models import ParkingSlot, Booking, ParkingLot, Vehicle, Notification
-from .serializers import (
-    UserSerializer, ParkingSlotSerializer, BookingSerializer, ParkingLotSerializer, 
-    VehicleSerializer, NotificationSerializer, PricingRateSerializer, 
-    ExtendBookingSerializer, PricePreviewSerializer, LoginSerializer, AdminParkingSlotSerializer
-)
+
+from rest_framework import generics, permissions, serializers, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
+
+from .models import Booking, Notification, ParkingLot, ParkingSlot, Vehicle
 from .permissions import IsAdminUser, IsCustomerUser, IsSecurityUser
-from django.db import models  # Add this import for Q objects
+from .pricing import calculate_booking_price, calculate_extension_price
+from .serializers import (
+    AdminParkingSlotSerializer,
+    BookingSerializer,
+    ExtendBookingSerializer,
+    LoginSerializer,
+    NotificationSerializer,
+    ParkingLotSerializer,
+    ParkingSlotSerializer,
+    PricePreviewSerializer,
+    PricingRateSerializer,
+    UserSerializer,
+    VehicleSerializer,
+)
+from .tokens import CustomRefreshToken
+from .notification_utils import (
+    create_booking_confirmation_notification,
+    create_booking_extension_notification,
+    create_booking_reminder_notification,
+    create_rich_notification,
+)
+
+User = get_user_model()
 
 class MarkVehicleLeftView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSecurityUser]
@@ -35,16 +61,6 @@ class MarkVehicleLeftView(APIView):
         booking.slot.save()
         
         return Response({"message": "Vehicle marked as left and slot is now free."}, status=status.HTTP_200_OK)
-from django.http import JsonResponse
-import math
-from geopy.distance import geodesic
-from rest_framework import generics, permissions
-from .models import Vehicle
-from .serializers import VehicleSerializer
-from .permissions import IsCustomerUser
-from rest_framework.views import APIView
-from django.db.models import Count, Q
-from django.db import models
 
 class APIRootView(APIView):
     """
@@ -350,8 +366,45 @@ class VehicleRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         # Only allow users to retrieve/update/delete their own vehicles
         return Vehicle.objects.filter(user=self.request.user)
 
+class UserDefaultVehicleView(APIView):
+    """
+    Get the user's default vehicle.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get(self, request):
+        try:
+            default_vehicle = Vehicle.objects.get(user=request.user, is_default=True)
+            serializer = VehicleSerializer(default_vehicle)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Vehicle.DoesNotExist:
+            # If no default, return the first vehicle or nothing
+            first_vehicle = Vehicle.objects.filter(user=request.user).first()
+            if first_vehicle:
+                serializer = VehicleSerializer(first_vehicle)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response({"message": "No vehicles found for this user."}, status=status.HTTP_404_NOT_FOUND)
 
+class SetDefaultVehicleView(APIView):
+    """
+    Set a vehicle as the user's default.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            vehicle_to_set = Vehicle.objects.get(pk=pk, user=request.user)
+            
+            # Unset other defaults
+            Vehicle.objects.filter(user=request.user).exclude(pk=pk).update(is_default=False)
+            
+            # Set the new default
+            vehicle_to_set.is_default = True
+            vehicle_to_set.save()
+            
+            return Response({"message": f"Vehicle {vehicle_to_set.number_plate} is now your default."}, status=status.HTTP_200_OK)
+        except Vehicle.DoesNotExist:
+            return Response({"error": "Vehicle not found or you do not have permission to access it."}, status=status.HTTP_404_NOT_FOUND)
 
 
 User = get_user_model()
@@ -412,9 +465,6 @@ class RegisterUserView(generics.CreateAPIView):
         }, status=status.HTTP_201_CREATED)
 
 # Custom JWT Login view
-from django.contrib.auth import authenticate
-from rest_framework_simplejwt.tokens import RefreshToken as BaseRefreshToken
-
 class LoginView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = LoginSerializer
@@ -440,7 +490,7 @@ class LoginView(generics.GenericAPIView):
             }, status=status.HTTP_401_UNAUTHORIZED)
         
         # Check if email is verified (skip in development)
-        from django.conf import settings
+        
         if not user.is_email_verified and not getattr(settings, 'SKIP_EMAIL_VERIFICATION', False):
             # NOTE: Email sending is disabled. In-app notifications will be used instead.
             # from .email_service import send_email_verification_email
@@ -579,7 +629,7 @@ class BookingCreateView(generics.CreateAPIView):
         booking = serializer.save()
         
         # Use our enhanced notification system
-        from .notification_utils import create_booking_confirmation_notification, create_booking_reminder_notification
+        
         
         # Create rich confirmation notification
         create_booking_confirmation_notification(booking)
@@ -638,7 +688,7 @@ class ExtendBookingView(APIView):
         booking.save()
         
         # Use our enhanced notification system
-        from .notification_utils import create_booking_extension_notification
+        
         
         # Create rich extension notification
         create_booking_extension_notification(booking, new_end_time, extension_price, is_automatic=False)
@@ -662,9 +712,6 @@ class UserBookingListView(generics.ListAPIView):
         return user_bookings.order_by('-start_time')
 
 # Customer: Cancel booking
-from rest_framework.decorators import action
-from rest_framework.views import APIView
-
 class CancelBookingView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCustomerUser]
 
@@ -682,7 +729,7 @@ class CancelBookingView(APIView):
         booking.slot.save()
         
         # Create a rich notification for booking cancellation
-        from .notification_utils import create_rich_notification
+        
         
         # Calculate any refund amount if applicable
         refund_amount = 0
@@ -1044,7 +1091,7 @@ class SystemNotificationStatusView(APIView):
         Get statistics about system notifications.
         Only admins can view these statistics.
         """
-        from django.db.models import Count
+        
         
         # Get notification counts by type
         notification_stats = Notification.objects.values('notification_type').annotate(
@@ -1118,7 +1165,7 @@ class SlotStatisticsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
     
     def get(self, request):
-        from django.db.models import Count, Q
+        
         
         # Get slot counts by vehicle type
         slot_stats = ParkingSlot.objects.values('vehicle_type').annotate(

@@ -38,14 +38,17 @@ urlpatterns = [
     path('bookings/<int:pk>/receipt/', GenerateReceiptView.as_view(), name='generate-receipt'),
     path('bookings/early-checkin/', EarlyCheckInView.as_view(), name='early-checkin'),
 
+    # Vehicle management
+    path('vehicles/', VehicleListCreateView.as_view(), name='vehicle-list-create'),
+    path('vehicles/<int:pk>/', VehicleRetrieveUpdateDestroyView.as_view(), name='vehicle-detail'),
+    path('vehicles/default/', views.UserDefaultVehicleView.as_view(), name='user-default-vehicle'),
+    path('vehicles/<int:pk>/set_default/', views.SetDefaultVehicleView.as_view(), name='user-set-default-vehicle'),
+
     # Admin booking management
     path('admin/bookings/', AdminAllBookingsView.as_view(), name='admin-all-bookings'),
     path('admin/bookings/<int:pk>/cancel/', AdminCancelBookingView.as_view(), name='admin-cancel-booking'),
     path('parking-lots/', views.ParkingLotsByLocationView.as_view(), name='parking-lots-by-location'),
     path('slots/find-nearest/', find_nearest_slot, name='find-nearest-slot'),
-    path('vehicles/list/', UserVehiclesView.as_view(), name='user-vehicles'),
-    path('vehicles/', VehicleListCreateView.as_view(), name='vehicle-list-create'),
-    path('vehicles/<int:pk>/', VehicleRetrieveUpdateDestroyView.as_view(), name='vehicle-detail'),
     path('reports/booking-by-vehicle-type/', BookingReportView.as_view(), name='booking-report'),
     
     # Notification endpoints

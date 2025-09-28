@@ -12,13 +12,38 @@ class ParkingLotAdmin(admin.ModelAdmin):
 
 @admin.register(ParkingSlot)
 class ParkingSlotAdmin(admin.ModelAdmin):
-    list_display = ('slot_number', 'parking_lot', 'floor', 'is_occupied')
-    list_filter = ('parking_lot', 'is_occupied', 'floor')
+    list_display = ['slot_number', 'floor', 'section', 'vehicle_type', 'is_occupied', 'parking_lot']
+    list_filter = ['vehicle_type', 'is_occupied', 'floor', 'parking_lot']
+    search_fields = ['slot_number', 'section']
+    list_editable = ['vehicle_type', 'is_occupied']
+    
+    actions = ['set_car_type', 'set_bike_type', 'set_truck_type', 'set_any_type']
+    
+    def set_car_type(self, request, queryset):
+        queryset.update(vehicle_type='car')
+        self.message_user(request, f'{queryset.count()} slots updated to Car type')
+    set_car_type.short_description = "Set selected slots to Car type"
+    
+    def set_bike_type(self, request, queryset):
+        queryset.update(vehicle_type='bike')
+        self.message_user(request, f'{queryset.count()} slots updated to Bike type')
+    set_bike_type.short_description = "Set selected slots to Bike type"
+    
+    def set_truck_type(self, request, queryset):
+        queryset.update(vehicle_type='truck')
+        self.message_user(request, f'{queryset.count()} slots updated to Truck type')
+    set_truck_type.short_description = "Set selected slots to Truck type"
+    
+    def set_any_type(self, request, queryset):
+        queryset.update(vehicle_type='any')
+        self.message_user(request, f'{queryset.count()} slots updated to Any Vehicle type')
+    set_any_type.short_description = "Set selected slots to Any Vehicle type"
 
 @admin.register(Vehicle)
 class VehicleAdmin(admin.ModelAdmin):
-    list_display = ('number_plate', 'user', 'vehicle_type', 'is_default')
-    list_filter = ('vehicle_type',)
+    list_display = ['number_plate', 'vehicle_type', 'model', 'user', 'is_default']
+    list_filter = ['vehicle_type', 'is_default']
+    search_fields = ['number_plate', 'model', 'user__username']
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
