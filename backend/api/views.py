@@ -617,14 +617,17 @@ class BookingCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         # Validate vehicle type compatibility before saving
         slot = serializer.validated_data['slot']
-        vehicle = serializer.validated_data.get('vehicle')
+        vehicle_data = serializer.validated_data.get('vehicle')
         
-        if vehicle and not slot.is_compatible_with_vehicle(vehicle.vehicle_type):
-            raise serializers.ValidationError({
-                'error': f'This slot is designated for {slot.get_vehicle_type_display()} vehicles only. Your vehicle is a {vehicle.get_vehicle_type_display()}.',
-                'slot_vehicle_type': slot.vehicle_type,
-                'your_vehicle_type': vehicle.vehicle_type
-            })
+        # Extract vehicle type from the raw vehicle data
+        if vehicle_data:
+            vehicle_type = vehicle_data.get('vehicle_type')
+            if vehicle_type and not slot.is_compatible_with_vehicle(vehicle_type):
+                raise serializers.ValidationError({
+                    'error': f'This slot is designated for {slot.get_vehicle_type_display()} vehicles only. Your vehicle is a {vehicle_type}.',
+                    'slot_vehicle_type': slot.vehicle_type,
+                    'your_vehicle_type': vehicle_type
+                })
         
         booking = serializer.save()
         

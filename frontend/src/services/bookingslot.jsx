@@ -1,22 +1,60 @@
 import http from './httpClient';
 
 export async function createBooking({ slot, vehicle, start_time, end_time, date, time, duration }) {
+  console.log('Creating booking with parameters:', {
+    slot, vehicle, start_time, end_time, date, time, duration
+  });
+  
   const bookingData = { 
     slot,
     vehicle
   };
   
   // Add datetime fields if provided - use start_time/end_time if available (preferred)
-  if (start_time) bookingData.start_time = start_time;
-  if (end_time) bookingData.end_time = end_time;
+  if (start_time) {
+    // Ensure date is properly formatted for API
+    if (start_time instanceof Date) {
+      bookingData.start_time = start_time.toISOString();
+    } else {
+      bookingData.start_time = start_time;
+    }
+  }
+  
+  if (end_time) {
+    // Ensure date is properly formatted for API
+    if (end_time instanceof Date) {
+      bookingData.end_time = end_time.toISOString();
+    } else {
+      bookingData.end_time = end_time;
+    }
+  }
   
   // Legacy support for date/time/duration
-  if (!start_time && date) bookingData.date = date;
+  if (!start_time && date) {
+    if (date instanceof Date) {
+      bookingData.date = date.toISOString().split('T')[0];
+    } else {
+      bookingData.date = date;
+    }
+  }
+  
   if (!start_time && time) bookingData.time = time;
   if (!end_time && duration) bookingData.duration = duration;
   
-  const { data } = await http.post('/api/bookings/', bookingData);
-  return data;
+  console.log('Final booking data being sent to API:', bookingData);
+  
+  try {
+    const { data } = await http.post('/api/bookings/', bookingData);
+    console.log('Booking created successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    if (error.response) {
+      console.error('Error response data:', error.response.data);
+      console.error('Error response status:', error.response.status);
+    }
+    throw error;
+  }
 }
 
 export async function getUpcomingBookings() {

@@ -139,14 +139,16 @@ def create_booking_reminder_notification(booking, time_before=None):
     # Check if the reminder time is in the future
     now = timezone.now()
     if reminder_time > now:
-        # Schedule the notification to be sent at reminder_time
-        from background_task.tasks import Task
-        Task.objects.create(
-            task_name='api.notification_utils.schedule_booking_reminder',
-            task_params=(booking.user.id, str(booking.id), message, additional_data),
-            run_at=reminder_time,
-            verbose_name=f"Reminder for booking {booking.id}"
-        )
+        # TODO: Schedule the notification to be sent at reminder_time
+        # Background task scheduling is disabled for now
+        # from background_task.tasks import Task
+        # Task.objects.create(
+        #     task_name='api.notification_utils.schedule_booking_reminder',
+        #     task_params=(booking.user.id, str(booking.id), message, additional_data),
+        #     run_at=reminder_time,
+        #     verbose_name=f"Reminder for booking {booking.id}"
+        # )
+        print(f"Would schedule reminder for booking {booking.id} at {reminder_time}")
     else:
         # If the reminder time has already passed, create the notification immediately
         create_rich_notification(

@@ -21,14 +21,27 @@ http.interceptors.request.use((config) => {
   
   // Handle date serialization for request data
   if (config.data) {
-    config.data = JSON.parse(
-      JSON.stringify(config.data, (key, value) => {
-        if (value instanceof Date) {
-          return value.toISOString();
-        }
-        return value;
-      })
-    );
+    try {
+      // Log the original data for debugging
+      console.log('Request data before serialization:', config.data);
+      
+      config.data = JSON.parse(
+        JSON.stringify(config.data, (key, value) => {
+          if (value instanceof Date) {
+            console.log(`Converting Date object for field "${key}": ${value} to ISO string`);
+            return value.toISOString();
+          }
+          return value;
+        })
+      );
+      
+      // Log the serialized data
+      console.log('Request data after serialization:', config.data);
+    } catch (error) {
+      console.error('Error serializing request data:', error);
+      console.error('Problematic data:', config.data);
+      // Continue with the original data if serialization fails
+    }
   }
   
   return config;

@@ -13,10 +13,10 @@ def login():
     """Login to get authentication token"""
     url = f"{BASE_URL}/api/auth/login/"
     headers = {'Content-Type': 'application/json'}
-    # Replace with valid credentials
+    # Using default admin credentials
     data = {
-        "email": "test@example.com", 
-        "password": "password123"
+        "email": "admin@example.com", 
+        "password": "admin123"
     }
     
     print(f"Attempting login with {data['email']}...")

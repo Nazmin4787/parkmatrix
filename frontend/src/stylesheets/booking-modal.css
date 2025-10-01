@@ -1,6 +1,33 @@
 /* Existing CSS above */
 
 /* New styles for the booking modal */
+.booking-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.close-modal-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.close-modal-btn:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
 .booking-date-time {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -24,11 +51,35 @@
   color: #4a5568;
 }
 
-.input-group input, .input-group select {
+.input-group input, .input-group select,
+.form-group input, .form-group select {
   padding: 10px;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
   font-size: 16px;
+  width: 100%;
+}
+
+.form-group input:focus, .form-group select:focus {
+  border-color: #3182ce;
+  box-shadow: 0 0 0 2px rgba(49, 130, 206, 0.2);
+  outline: none;
+}
+
+.form-group input:invalid, .form-group select:invalid {
+  border-color: #e53e3e;
+}
+
+.required-field {
+  color: #e53e3e;
+  margin-left: 3px;
+}
+
+.form-hint {
+  color: #718096;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
 }
 
 .vehicle-form {
@@ -50,6 +101,27 @@
   font-weight: 600;
 }
 
+/* New styles for warnings and links */
+.warning-message {
+  background-color: #FFF5F5;
+  border: 1px solid #FEB2B2;
+  color: #C53030;
+  padding: 12px;
+  border-radius: 4px;
+  margin: 10px 0;
+  font-size: 14px;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #3182CE;
+  padding: 0 4px;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+}
+
 .booking-summary {
   background-color: #f7fafc;
   padding: 15px;
@@ -67,4 +139,45 @@
 .booking-summary p {
   margin: 5px 0;
   font-size: 14px;
+}
+
+.booking-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.confirm-booking-btn {
+  flex: 2;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(45deg, #00b894, #00a884);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.confirm-booking-btn:hover {
+  background: linear-gradient(45deg, #00a884, #009874);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 168, 132, 0.2);
+}
+
+.cancel-booking-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-booking-btn:hover {
+  background: #f9f9f9;
 }

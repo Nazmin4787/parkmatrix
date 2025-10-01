@@ -3,7 +3,11 @@ import '../stylesheets/slots.css';
 
 export default function SlotCard({ slot, onBook, disabled, userVehicleType }) {
   const isBooked = Boolean(slot.is_occupied);
-  const isCompatible = !userVehicleType || slot.vehicle_type === 'any' || slot.vehicle_type === userVehicleType;
+  // Fix compatibility logic - a slot is compatible if:
+  // 1. It's for "any" vehicle type, OR
+  // 2. User doesn't have a specific vehicle type selected, OR
+  // 3. The slot's vehicle type matches the user's vehicle type
+  const isCompatible = slot.vehicle_type === 'any' || !userVehicleType || slot.vehicle_type === userVehicleType;
   
   const getVehicleTypeIcon = (type) => {
     const icons = {
@@ -49,11 +53,11 @@ export default function SlotCard({ slot, onBook, disabled, userVehicleType }) {
         </div>
       )}
       <button
-        className="slot-book-btn"
+        className={`slot-book-btn ${disabled ? 'booking' : ''}`}
         onClick={() => onBook && onBook(slot.id)}
         disabled={isBooked || disabled || !isCompatible}
       >
-        {isBooked ? 'Unavailable' : !isCompatible ? 'Incompatible' : 'Book now'}
+        {disabled ? 'Booking...' : isBooked ? 'Unavailable' : !isCompatible ? 'Incompatible' : 'Quick Book'}
       </button>
     </div>
   );
