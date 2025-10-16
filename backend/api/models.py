@@ -119,6 +119,15 @@ class Vehicle(models.Model):
 
 # Booking model
 class Booking(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('checked_in', 'Checked In'),
+        ('checked_out', 'Checked Out'),
+        ('cancelled', 'Cancelled'),
+        ('expired', 'Expired'),
+    ]
+    
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     slot = models.ForeignKey(ParkingSlot, on_delete=models.CASCADE)
     vehicle = models.ForeignKey('Vehicle', on_delete=models.SET_NULL, null=True, blank=True)
@@ -127,20 +136,166 @@ class Booking(models.Model):
     total_price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     vehicle_has_left = models.BooleanField(default=False)
+    
+    # Status tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
 
     # Fields for handling extensions
     initial_end_time = models.DateTimeField(null=True, blank=True)
     extension_count = models.PositiveIntegerField(default=0)
     extension_history = models.JSONField(default=list, blank=True)
+    
+    # Check-in fields
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_in_bookings')
+    checked_in_ip = models.GenericIPAddressField(null=True, blank=True)
+    check_in_notes = models.TextField(blank=True, null=True)
+    
+    # Check-out fields
+    checked_out_at = models.DateTimeField(null=True, blank=True)
+    checked_out_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_out_bookings')
+    checked_out_ip = models.GenericIPAddressField(null=True, blank=True)
+    check_out_notes = models.TextField(blank=True, null=True)
+    
+    # Overtime calculation
+    actual_duration_minutes = models.IntegerField(null=True, blank=True)
+    overtime_minutes = models.IntegerField(default=0)
+    overtime_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
 
     def save(self, *args, **kwargs):
         if not self.initial_end_time:
             self.initial_end_time = self.end_time
         super().save(*args, **kwargs)
+    
+    def can_check_in(self, user):
+        """
+        Validate if booking can be checked in.
+        Returns: (bool, str) - (can_check_in, error_message)
+        """
+        # Check if already checked in
+        if self.status == 'checked_in':
+            return False, "Booking is already checked in"
+        
+        # Check if already checked out
+        if self.status == 'checked_out':
+            return False, "Booking has already been checked out"
+        
+        # Check if cancelled or expired
+        if self.status in ['cancelled', 'expired']:
+            return False, f"Cannot check in a {self.status} booking"
+        
+        # Check user role permissions
+        if user.role not in ['security', 'admin']:
+            # Customers can only check in their own bookings
+            if user != self.user:
+                return False, "You can only check in your own bookings"
+        
+        # Check time window (30 minutes before start to 2 hours after end time)
+        now = timezone.now()
+        check_in_window_start = self.start_time - timezone.timedelta(minutes=30)
+        grace_period = timezone.timedelta(hours=2)
+        check_in_window_end = self.end_time + grace_period
+        
+        if now < check_in_window_start:
+            minutes_early = int((check_in_window_start - now).total_seconds() / 60)
+            return False, f"Check-in opens {minutes_early} minutes before booking start time"
+        
+        if now > check_in_window_end:
+            return False, "Booking expired beyond grace period. Check-in window has closed"
+        
+        return True, ""
+    
+    def can_check_out(self, user):
+        """
+        Validate if booking can be checked out.
+        Returns: (bool, str) - (can_check_out, error_message)
+        """
+        # Must be checked in first
+        if self.status != 'checked_in':
+            return False, "Booking must be checked in before checking out"
+        
+        # Check if already checked out
+        if self.status == 'checked_out':
+            return False, "Booking has already been checked out"
+        
+        # Check user role permissions
+        if user.role not in ['security', 'admin']:
+            # Customers can only check out their own bookings
+            if user != self.user:
+                return False, "You can only check out your own bookings"
+        
+        return True, ""
+    
+    def calculate_overtime(self):
+        """
+        Calculate overtime charges if check-out is after end_time.
+        Updates overtime_minutes and overtime_amount fields.
+        """
+        if not self.checked_out_at:
+            return
+        
+        # Calculate actual duration
+        if self.checked_in_at:
+            actual_duration = self.checked_out_at - self.checked_in_at
+            self.actual_duration_minutes = int(actual_duration.total_seconds() / 60)
+        
+        # Calculate overtime
+        if self.checked_out_at > self.end_time:
+            overtime = self.checked_out_at - self.end_time
+            self.overtime_minutes = int(overtime.total_seconds() / 60)
+            
+            # Calculate overtime charge (hourly rate from parking lot)
+            if self.overtime_minutes > 0 and self.slot.parking_lot:
+                overtime_hours = self.overtime_minutes / 60
+                hourly_rate = self.slot.parking_lot.hourly_rate or 0
+                self.overtime_amount = round(overtime_hours * float(hourly_rate), 2)
+        else:
+            self.overtime_minutes = 0
+            self.overtime_amount = 0.00
 
     def __str__(self):
         vehicle_info = f" with {self.vehicle.number_plate}" if self.vehicle else ""
         return f"Booking by {self.user.username} on slot {self.slot.slot_number}{vehicle_info}"
+
+
+class AuditLog(models.Model):
+    """
+    Tracks all check-in and check-out attempts for security and audit purposes.
+    """
+    ACTION_CHOICES = [
+        ('check_in_attempt', 'Check-in Attempt'),
+        ('check_in_success', 'Check-in Success'),
+        ('check_in_failed', 'Check-in Failed'),
+        ('check_out_attempt', 'Check-out Attempt'),
+        ('check_out_success', 'Check-out Success'),
+        ('check_out_failed', 'Check-out Failed'),
+    ]
+    
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='audit_logs')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, null=True)
+    
+    # Additional metadata
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    additional_data = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['booking', '-timestamp']),
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['action', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        status = "Success" if self.success else "Failed"
+        return f"{self.action} - {status} by {self.user.username if self.user else 'Unknown'} at {self.timestamp}"
+
 
 class PricingRate(models.Model):
     rate_name = models.CharField(max_length=100, unique=True)

@@ -7,10 +7,13 @@ import UserDashboard from './pages/user/Dashboard';
 import AdminDashboard from './pages/administration/Dashboard';
 import AvailableSlots from './pages/user/AvailableSlots';
 import BookingHistory from './pages/user/BookingHistory';
+import EnhancedBookingHistory from './pages/user/EnhancedBookingHistory';
 import BookingHistoryDebug from './pages/user/BookingHistoryDebug';
 import SimpleBookingsList from './pages/user/SimpleBookingsList';
 import UserDebug from './pages/user/UserDebug';
 import BookingFlow from './pages/user/BookingFlow';
+import CheckInCheckOut from './pages/user/CheckInCheckOut';
+import Phase8TestPage from './pages/Phase8TestPage';
 import ManageSlots from './pages/administration/ManageSlots';
 import EditSlot from './pages/administration/EditSlot';
 import AdminListBookings from './pages/administration/list_bookings';
@@ -41,9 +44,12 @@ export default function MainApp() {
         <Route path="/dashboard" element={<Guard roles={['customer']}><UserDashboard /></Guard>} />
         <Route path="/slots" element={<Guard roles={['customer']}><AvailableSlots /></Guard>} />
         <Route path="/booking" element={<Guard roles={['customer']}><BookingFlow /></Guard>} />
-        <Route path="/bookings" element={<Guard roles={['customer']}><BookingHistory /></Guard>} />
+        <Route path="/checkin-checkout" element={<Guard roles={['customer']}><CheckInCheckOut /></Guard>} />
+        <Route path="/bookings" element={<Guard roles={['customer']}><EnhancedBookingHistory /></Guard>} />
+        <Route path="/bookings-legacy" element={<Guard roles={['customer']}><BookingHistory /></Guard>} />
         <Route path="/simple-bookings" element={<Guard roles={['customer']}><SimpleBookingsList /></Guard>} />
         <Route path="/bookings-debug" element={<BookingHistoryDebug />} />
+        <Route path="/phase8-test" element={<Phase8TestPage />} />
         <Route path="/user-debug" element={<UserDebug />} />
         <Route path="/admin" element={<Guard roles={['admin']}><AdminDashboard /></Guard>} />
         <Route path="/admin/slots" element={<Guard roles={['admin']}><ManageSlots /></Guard>} />

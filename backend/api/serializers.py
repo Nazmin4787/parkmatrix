@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification
+from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification, AuditLog
 from datetime import timedelta
 from django.utils import timezone
 
@@ -98,14 +98,27 @@ class BookingSerializer(serializers.ModelSerializer):
     # Use CharField for start/end time to accept various formats
     start_time = serializers.DateTimeField()
     end_time = serializers.DateTimeField()
+    
+    # Read-only fields for check-in/check-out details
+    checked_in_by = UserSerializer(read_only=True)
+    checked_out_by = UserSerializer(read_only=True)
 
     class Meta:
         model = Booking
         fields = [
             'id', 'user', 'slot', 'vehicle', 'start_time', 'end_time', 
-            'total_price', 'is_active', 'initial_end_time', 'extension_count'
+            'total_price', 'is_active', 'initial_end_time', 'extension_count',
+            'status', 'checked_in_at', 'checked_in_by', 'checked_in_ip',
+            'check_in_notes', 'checked_out_at', 'checked_out_by', 
+            'checked_out_ip', 'check_out_notes', 'actual_duration_minutes',
+            'overtime_minutes', 'overtime_amount'
         ]
-        read_only_fields = ['user', 'total_price', 'initial_end_time', 'extension_count']
+        read_only_fields = [
+            'user', 'total_price', 'initial_end_time', 'extension_count',
+            'status', 'checked_in_at', 'checked_in_by', 'checked_in_ip',
+            'checked_out_at', 'checked_out_by', 'checked_out_ip',
+            'actual_duration_minutes', 'overtime_minutes', 'overtime_amount'
+        ]
 
     def validate(self, data):
         start_time = data.get('start_time')
@@ -276,3 +289,64 @@ class AdminParkingSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = ParkingSlot
         fields = ['id', 'slot_number', 'floor', 'section', 'vehicle_type', 'is_occupied', 'parking_lot', 'parking_lot_name', 'pos_x', 'pos_y', 'height_cm', 'width_cm', 'length_cm']
+
+
+# Check-in/Check-out Serializers
+class CheckInSerializer(serializers.Serializer):
+    """
+    Serializer for check-in operation
+    """
+    booking_id = serializers.IntegerField()
+    notes = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_booking_id(self, value):
+        try:
+            booking = Booking.objects.get(id=value)
+        except Booking.DoesNotExist:
+            raise serializers.ValidationError("Booking not found")
+        return value
+
+
+class CheckOutSerializer(serializers.Serializer):
+    """
+    Serializer for check-out operation
+    """
+    booking_id = serializers.IntegerField()
+    notes = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_booking_id(self, value):
+        try:
+            booking = Booking.objects.get(id=value)
+        except Booking.DoesNotExist:
+            raise serializers.ValidationError("Booking not found")
+        return value
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for AuditLog model
+    """
+    user = UserSerializer(read_only=True)
+    booking_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'booking', 'booking_details', 'user', 'action', 
+            'timestamp', 'ip_address', 'user_agent', 'success', 
+            'error_message', 'notes', 'additional_data'
+        ]
+        read_only_fields = ['timestamp']
+    
+    def get_booking_details(self, obj):
+        """
+        Return minimal booking information for audit log display
+        """
+        if obj.booking:
+            return {
+                'id': obj.booking.id,
+                'slot_number': obj.booking.slot.slot_number,
+                'user': obj.booking.user.username,
+                'vehicle': obj.booking.vehicle.number_plate if obj.booking.vehicle else None
+            }
+        return None

@@ -9,6 +9,7 @@ from .views import (
     NotificationListView, NotificationMarkAsReadView, NotificationDeleteView, NotificationUnreadCountView,
     MarkAllNotificationsAsReadView, SystemAlertCreateView, MaintenanceAlertCreateView, SystemNotificationStatusView,
     APIRootView, SlotManagementView, BulkSlotUpdateView, SlotStatisticsView,
+    CheckInView, CheckOutView, ActiveBookingView,
 )
 from .notification_public_views import PublicNotificationUnreadCountView
 from .receipt_views import GenerateReceiptView
@@ -29,9 +30,12 @@ urlpatterns = [
     path('slots/<int:pk>/', ParkingSlotRetrieveUpdateDestroyView.as_view(), name='slot-detail'),
 
     path('bookings/', BookingCreateView.as_view(), name='booking-create'),
-    path('bookings/user/', UserBookingListView.as_view(), name='user-bookings'),
+    path('bookings/my/', UserBookingListView.as_view(), name='my-bookings'),
+    path('bookings/active/', views.ActiveBookingView.as_view(), name='active-booking'),
     path('bookings/upcoming/', UpcomingBookingsView.as_view(), name='upcoming-bookings'),
     path('bookings/price-preview/', views.PricePreviewView.as_view(), name='price-preview'),
+    path('bookings/<int:pk>/checkin/', views.CheckInView.as_view(), name='booking-checkin'),
+    path('bookings/<int:pk>/checkout/', views.CheckOutView.as_view(), name='booking-checkout'),
     path('bookings/<int:pk>/cancel/', CancelBookingView.as_view(), name='cancel-booking'),
     path('bookings/<int:pk>/extend/', views.ExtendBookingView.as_view(), name='extend-booking'),
     path('bookings/<int:pk>/mark-left/', views.MarkVehicleLeftView.as_view(), name='mark-vehicle-left'),

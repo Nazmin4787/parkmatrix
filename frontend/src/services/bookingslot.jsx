@@ -78,7 +78,7 @@ export async function getPricePreview({ slot, vehicle, date, time, duration }) {
 export async function getUserBookings() {
   try {
     console.log('Getting user bookings...');
-    const response = await http.get('/api/bookings/user/');
+    const response = await http.get('/api/bookings/my/');
     console.log('User bookings response:', response);
     return response.data;
   } catch (error) {
@@ -119,4 +119,99 @@ export async function getBookingPricePreview({ slot, date, time, duration, vehic
   
   const { data } = await http.post('/api/bookings/price-preview/', previewData);
   return data;
+}
+
+// Check-in/Check-out Functions
+
+export async function getMyBookings() {
+  try {
+    console.log('Getting my bookings...');
+    const response = await http.get('/api/bookings/my/');
+    console.log('My bookings response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching my bookings:', error);
+    throw error;
+  }
+}
+
+export async function getActiveBooking() {
+  try {
+    console.log('Getting active booking...');
+    const response = await http.get('/api/bookings/active/');
+    console.log('Active booking response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching active booking:', error);
+    if (error.response?.status === 404) {
+      // No active booking found
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function checkInBooking(bookingId, notes = '') {
+  try {
+    console.log(`Checking in booking ${bookingId}...`);
+    const requestData = {};
+    if (notes) {
+      requestData.notes = notes;
+    }
+    const response = await http.post(`/api/bookings/${bookingId}/checkin/`, requestData);
+    console.log('Check-in response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error checking in booking:', error);
+    if (error.response) {
+      console.error('Check-in error response data:', error.response.data);
+      console.error('Check-in error response status:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+export async function checkOutBooking(bookingId, notes = '') {
+  try {
+    console.log(`Checking out booking ${bookingId}...`);
+    const requestData = {};
+    if (notes) {
+      requestData.notes = notes;
+    }
+    const response = await http.post(`/api/bookings/${bookingId}/checkout/`, requestData);
+    console.log('Check-out response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error checking out booking:', error);
+    if (error.response) {
+      console.error('Check-out error response data:', error.response.data);
+      console.error('Check-out error response status:', error.response.status);
+    }
+    throw error;
+  }
+}
+
+export async function getBookingHistory({ page = 1, page_size = 10 } = {}) {
+  try {
+    console.log('Getting booking history...');
+    const params = { page, page_size };
+    const response = await http.get('/api/bookings/my/', { params });
+    console.log('Booking history response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching booking history:', error);
+    throw error;
+  }
+}
+
+export async function getBookingDetails(bookingId) {
+  try {
+    console.log(`Getting booking details for ${bookingId}...`);
+    const response = await http.get(`/api/bookings/${bookingId}/`);
+    console.log('Booking details response:', response);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching booking details:', error);
+    throw error;
+  }
 }

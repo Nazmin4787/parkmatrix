@@ -1,9 +1,12 @@
 import math
+import time
+from functools import wraps
 from geopy.distance import geodesic
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.db import models
 from django.db.models import Count, Q
 from django.http import JsonResponse
@@ -17,12 +20,14 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Booking, Notification, ParkingLot, ParkingSlot, Vehicle
+from .models import Booking, Notification, ParkingLot, ParkingSlot, Vehicle, AuditLog
 from .permissions import IsAdminUser, IsCustomerUser, IsSecurityUser
 from .pricing import calculate_booking_price, calculate_extension_price
 from .serializers import (
     AdminParkingSlotSerializer,
     BookingSerializer,
+    CheckInSerializer,
+    CheckOutSerializer,
     ExtendBookingSerializer,
     LoginSerializer,
     NotificationSerializer,
@@ -42,6 +47,37 @@ from .notification_utils import (
 )
 
 User = get_user_model()
+
+
+# Rate limiting decorator for check-in/check-out endpoints
+def rate_limit(max_requests=5, time_window=60):
+    """
+    Simple rate limiting decorator using Django cache
+    max_requests: Maximum number of requests allowed
+    time_window: Time window in seconds
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(self, request, *args, **kwargs):
+            # Create unique key based on user and endpoint
+            key = f"rate_limit:{request.user.id}:{request.path}"
+            
+            # Get current request count
+            current_requests = cache.get(key, 0)
+            
+            if current_requests >= max_requests:
+                return Response(
+                    {"error": f"Rate limit exceeded. Maximum {max_requests} requests per {time_window} seconds."},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+            
+            # Increment counter
+            cache.set(key, current_requests + 1, time_window)
+            
+            return view_func(self, request, *args, **kwargs)
+        return wrapper
+    return decorator
+
 
 class MarkVehicleLeftView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsSecurityUser]
@@ -723,8 +759,13 @@ class CancelBookingView(APIView):
             booking = Booking.objects.get(pk=pk, user=request.user, is_active=True)
         except Booking.DoesNotExist:
             return Response({"error": "Active booking not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if booking is already checked in - don't allow cancellation
+        if booking.status == 'checked_in':
+            return Response({"error": "Cannot cancel a booking that is already checked in."}, status=status.HTTP_400_BAD_REQUEST)
 
         booking.is_active = False
+        booking.status = 'cancelled'
         booking.end_time = timezone.now()
         booking.save()
         # Free the parking slot
@@ -789,6 +830,240 @@ class CancelBookingView(APIView):
 
         return Response({"message": "Booking cancelled successfully."}, status=status.HTTP_200_OK)
 
+
+# Check-in View
+class CheckInView(APIView):
+    """
+    Allows customers to check in their own bookings, 
+    or security/admin to check in any booking
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @rate_limit(max_requests=10, time_window=300)  # 10 requests per 5 minutes
+    def post(self, request, pk):
+        # Get booking ID from URL parameter
+        booking_id = pk
+        notes = request.data.get('notes', '')
+        
+        try:
+            booking = Booking.objects.get(id=booking_id)
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Validate if check-in is allowed
+        can_check_in, error_message = booking.can_check_in(request.user)
+        if not can_check_in:
+            # Log failed attempt
+            AuditLog.objects.create(
+                booking=booking,
+                user=request.user,
+                action='check_in_failed',
+                ip_address=self.get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                success=False,
+                error_message=error_message,
+                notes=notes
+            )
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Perform check-in
+        booking.checked_in_at = timezone.now()
+        booking.checked_in_by = request.user
+        booking.checked_in_ip = self.get_client_ip(request)
+        booking.check_in_notes = notes
+        booking.status = 'checked_in'
+        booking.save()
+        
+        # Log successful check-in
+        AuditLog.objects.create(
+            booking=booking,
+            user=request.user,
+            action='check_in_success',
+            ip_address=self.get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            success=True,
+            notes=notes
+        )
+        
+        # Create notification
+        create_rich_notification(
+            user=booking.user,
+            notification_type='booking_update',
+            title='Vehicle Checked In',
+            message=f'Your vehicle {booking.vehicle.number_plate} has been checked in to slot {booking.slot.slot_number}.',
+            related_object_id=str(booking.id),
+            related_object_type='Booking',
+            additional_data={
+                'booking_id': str(booking.id),
+                'slot_number': booking.slot.slot_number,
+                'checked_in_at': booking.checked_in_at.isoformat(),
+                'vehicle': booking.vehicle.number_plate if booking.vehicle else None
+            }
+        )
+        
+        serialized_booking = BookingSerializer(booking)
+        return Response({
+            "message": "Check-in successful",
+            "booking": serialized_booking.data
+        }, status=status.HTTP_200_OK)
+    
+    def get_client_ip(self, request):
+        """Extract client IP from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+
+# Check-out View
+class CheckOutView(APIView):
+    """
+    Allows customers to check out their own bookings,
+    or security/admin to check out any booking
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @rate_limit(max_requests=10, time_window=300)  # 10 requests per 5 minutes
+    def post(self, request, pk):
+        # Get booking ID from URL parameter
+        booking_id = pk
+        notes = request.data.get('notes', '')
+        
+        try:
+            booking = Booking.objects.get(id=booking_id)
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Validate if check-out is allowed
+        can_check_out, error_message = booking.can_check_out(request.user)
+        if not can_check_out:
+            # Log failed attempt
+            AuditLog.objects.create(
+                booking=booking,
+                user=request.user,
+                action='check_out_failed',
+                ip_address=self.get_client_ip(request),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                success=False,
+                error_message=error_message,
+                notes=notes
+            )
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Perform check-out
+        booking.checked_out_at = timezone.now()
+        booking.checked_out_by = request.user
+        booking.checked_out_ip = self.get_client_ip(request)
+        booking.check_out_notes = notes
+        booking.status = 'checked_out'
+        
+        # Calculate overtime
+        booking.calculate_overtime()
+        booking.save()
+        
+        # Free the parking slot
+        booking.slot.is_occupied = False
+        booking.slot.save()
+        
+        # Log successful check-out
+        AuditLog.objects.create(
+            booking=booking,
+            user=request.user,
+            action='check_out_success',
+            ip_address=self.get_client_ip(request),
+            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            success=True,
+            notes=notes,
+            additional_data={
+                'overtime_minutes': booking.overtime_minutes,
+                'overtime_amount': str(booking.overtime_amount)
+            }
+        )
+        
+        # Create notification with overtime info
+        overtime_message = ""
+        if booking.overtime_minutes > 0:
+            overtime_message = f"\n\nOvertime: {booking.overtime_minutes} minutes (${booking.overtime_amount})"
+        
+        create_rich_notification(
+            user=booking.user,
+            notification_type='booking_update',
+            title='Vehicle Checked Out',
+            message=f'Your vehicle {booking.vehicle.number_plate} has been checked out from slot {booking.slot.slot_number}.{overtime_message}',
+            related_object_id=str(booking.id),
+            related_object_type='Booking',
+            additional_data={
+                'booking_id': str(booking.id),
+                'slot_number': booking.slot.slot_number,
+                'checked_out_at': booking.checked_out_at.isoformat(),
+                'vehicle': booking.vehicle.number_plate if booking.vehicle else None,
+                'overtime_minutes': booking.overtime_minutes,
+                'overtime_amount': str(booking.overtime_amount)
+            }
+        )
+        
+        serialized_booking = BookingSerializer(booking)
+        return Response({
+            "message": "Check-out successful",
+            "booking": serialized_booking.data,
+            "overtime_charge": str(booking.overtime_amount) if booking.overtime_minutes > 0 else "0.00"
+        }, status=status.HTTP_200_OK)
+    
+    def get_client_ip(self, request):
+        """Extract client IP from request"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+
+# Get Active Booking View (for showing which booking can be checked in/out)
+class ActiveBookingView(APIView):
+    """
+    Returns the user's active booking that can be checked in or is currently checked in
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCustomerUser]
+
+    def get(self, request):
+        now = timezone.now()
+        
+        # Find active booking that is either:
+        # 1. Confirmed and within check-in window (30 min before start to end time)
+        # 2. Already checked in but not checked out
+        check_in_window_start = now - timezone.timedelta(minutes=30)
+        
+        active_booking = Booking.objects.filter(
+            user=request.user,
+            is_active=True,
+            status__in=['confirmed', 'checked_in'],
+            start_time__lte=now + timezone.timedelta(minutes=30),  # Include bookings starting soon
+            end_time__gte=now  # Haven't expired yet
+        ).order_by('start_time').first()
+        
+        if active_booking:
+            serializer = BookingSerializer(active_booking)
+            
+            # Add check-in/check-out eligibility
+            can_check_in, check_in_msg = active_booking.can_check_in(request.user)
+            can_check_out, check_out_msg = active_booking.can_check_out(request.user)
+            
+            return Response({
+                "booking": serializer.data,
+                "can_check_in": can_check_in,
+                "check_in_message": check_in_msg if not can_check_in else "",
+                "can_check_out": can_check_out,
+                "check_out_message": check_out_msg if not can_check_out else ""
+            }, status=status.HTTP_200_OK)
+        
+        return Response({
+            "message": "No active booking found"
+        }, status=status.HTTP_404_NOT_FOUND)
+
+
 # Admin: View all bookings
 class AdminAllBookingsView(generics.ListAPIView):
     queryset = Booking.objects.all().order_by('-start_time')
@@ -807,6 +1082,7 @@ class AdminCancelBookingView(APIView):
 
         if booking.is_active:
             booking.is_active = False
+            booking.status = 'cancelled'
             booking.end_time = timezone.now()
             booking.save()
             # Free the parking slot

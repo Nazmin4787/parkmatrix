@@ -222,3 +222,240 @@
     width: 95%;
   }
 }
+
+/* Enhanced Booking History Styles */
+.enhanced-booking-history {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.booking-header-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.booking-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.stat-item.confirmed {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1d4ed8;
+}
+
+.stat-item.checked-in {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #047857;
+}
+
+.stat-item.checked-out {
+  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+  color: #374151;
+}
+
+.enhanced-tab-navigation {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: #f8fafc;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tab-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.error-container {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.error-container h4 {
+  margin: 0 0 12px 0;
+  color: #dc2626;
+}
+
+.error-container p {
+  margin: 8px 0;
+  color: #7f1d1d;
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-radius: 12px;
+  border: 2px dashed #cbd5e1;
+  margin: 20px 0;
+}
+
+.empty-state p {
+  margin: 8px 0;
+  color: #64748b;
+}
+
+.empty-state p:first-child {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.booking-count {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-radius: 8px;
+  border-left: 4px solid #0ea5e9;
+  color: #0c4a6e;
+  font-weight: 500;
+}
+
+.enhanced-booking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-content.enhanced {
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Enhanced responsive design */
+@media (max-width: 768px) {
+  .booking-header-controls {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .booking-stats {
+    justify-content: center;
+  }
+  
+  .enhanced-tab-navigation {
+    flex-direction: column;
+  }
+  
+  .tab-btn {
+    text-align: center;
+  }
+  
+  .error-actions {
+    flex-direction: column;
+  }
+  
+  .modal-content.enhanced {
+    width: 95%;
+    margin: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .enhanced-booking-history {
+    padding: 0 10px;
+  }
+  
+  .booking-header-controls {
+    padding: 12px;
+  }
+  
+  .stat-item {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+  
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 0.875rem;
+  }
+  
+  .empty-state {
+    padding: 40px 16px;
+  }
+}
