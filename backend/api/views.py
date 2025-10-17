@@ -45,6 +45,11 @@ from .notification_utils import (
     create_booking_reminder_notification,
     create_rich_notification,
 )
+from .utils import (
+    is_within_parking_area,
+    validate_location_data,
+    COLLEGE_PARKING_CENTER,
+)
 
 User = get_user_model()
 
@@ -845,6 +850,45 @@ class CheckInView(APIView):
         booking_id = pk
         notes = request.data.get('notes', '')
         
+        # ============================================
+        # LOCATION VALIDATION (GEO-FENCING)
+        # ============================================
+        user_latitude = request.data.get('latitude')
+        user_longitude = request.data.get('longitude')
+        
+        # Check if location data is provided
+        if not user_latitude or not user_longitude:
+            return Response({
+                "error": "Location required",
+                "message": "Please enable GPS/location services to check in. Your location must be verified to ensure you are at the parking area."
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate location data format
+        is_valid, validation_error = validate_location_data(user_latitude, user_longitude)
+        if not is_valid:
+            return Response({
+                "error": "Invalid location data",
+                "message": validation_error
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user is within parking area (checks all parking locations)
+        is_within, distance, allowed_radius, location_name = is_within_parking_area(
+            float(user_latitude), 
+            float(user_longitude)
+        )
+        
+        if not is_within:
+            return Response({
+                "error": "Location verification failed",
+                "message": f"You must be at a parking location to check in. You are {int(distance)}m away from {location_name} (allowed radius: {int(allowed_radius)}m).",
+                "distance_meters": int(distance),
+                "allowed_radius_meters": int(allowed_radius),
+                "nearest_location": location_name
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # ============================================
+        # CONTINUE WITH NORMAL CHECK-IN LOGIC
+        # ============================================
         try:
             booking = Booking.objects.get(id=booking_id)
         except Booking.DoesNotExist:
@@ -853,7 +897,7 @@ class CheckInView(APIView):
         # Validate if check-in is allowed
         can_check_in, error_message = booking.can_check_in(request.user)
         if not can_check_in:
-            # Log failed attempt
+            # Log failed attempt (with location data)
             AuditLog.objects.create(
                 booking=booking,
                 user=request.user,
@@ -862,7 +906,13 @@ class CheckInView(APIView):
                 user_agent=request.META.get('HTTP_USER_AGENT', ''),
                 success=False,
                 error_message=error_message,
-                notes=notes
+                notes=notes,
+                additional_data={
+                    'latitude': float(user_latitude),
+                    'longitude': float(user_longitude),
+                    'distance_from_parking': distance,
+                    'within_allowed_area': is_within
+                }
             )
             return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -874,7 +924,7 @@ class CheckInView(APIView):
         booking.status = 'checked_in'
         booking.save()
         
-        # Log successful check-in
+        # Log successful check-in (with location data)
         AuditLog.objects.create(
             booking=booking,
             user=request.user,
@@ -882,7 +932,14 @@ class CheckInView(APIView):
             ip_address=self.get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
             success=True,
-            notes=notes
+            notes=notes,
+            additional_data={
+                'latitude': float(user_latitude),
+                'longitude': float(user_longitude),
+                'distance_from_parking': distance,
+                'within_allowed_area': is_within,
+                'parking_location': location_name
+            }
         )
         
         # Create notification
@@ -931,6 +988,45 @@ class CheckOutView(APIView):
         booking_id = pk
         notes = request.data.get('notes', '')
         
+        # ============================================
+        # LOCATION VALIDATION (GEO-FENCING)
+        # ============================================
+        user_latitude = request.data.get('latitude')
+        user_longitude = request.data.get('longitude')
+        
+        # Check if location data is provided
+        if not user_latitude or not user_longitude:
+            return Response({
+                "error": "Location required",
+                "message": "Please enable GPS/location services to check out. Your location must be verified to ensure you are at the parking area."
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate location data format
+        is_valid, validation_error = validate_location_data(user_latitude, user_longitude)
+        if not is_valid:
+            return Response({
+                "error": "Invalid location data",
+                "message": validation_error
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if user is within parking area (checks all parking locations)
+        is_within, distance, allowed_radius, location_name = is_within_parking_area(
+            float(user_latitude), 
+            float(user_longitude)
+        )
+        
+        if not is_within:
+            return Response({
+                "error": "Location verification failed",
+                "message": f"You must be at a parking location to check out. You are {int(distance)}m away from {location_name} (allowed radius: {int(allowed_radius)}m).",
+                "distance_meters": int(distance),
+                "allowed_radius_meters": int(allowed_radius),
+                "nearest_location": location_name
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        # ============================================
+        # CONTINUE WITH NORMAL CHECK-OUT LOGIC
+        # ============================================
         try:
             booking = Booking.objects.get(id=booking_id)
         except Booking.DoesNotExist:
@@ -939,7 +1035,7 @@ class CheckOutView(APIView):
         # Validate if check-out is allowed
         can_check_out, error_message = booking.can_check_out(request.user)
         if not can_check_out:
-            # Log failed attempt
+            # Log failed attempt (with location data)
             AuditLog.objects.create(
                 booking=booking,
                 user=request.user,
@@ -948,7 +1044,13 @@ class CheckOutView(APIView):
                 user_agent=request.META.get('HTTP_USER_AGENT', ''),
                 success=False,
                 error_message=error_message,
-                notes=notes
+                notes=notes,
+                additional_data={
+                    'latitude': float(user_latitude),
+                    'longitude': float(user_longitude),
+                    'distance_from_parking': distance,
+                    'within_allowed_area': is_within
+                }
             )
             return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -967,7 +1069,7 @@ class CheckOutView(APIView):
         booking.slot.is_occupied = False
         booking.slot.save()
         
-        # Log successful check-out
+        # Log successful check-out (with location data)
         AuditLog.objects.create(
             booking=booking,
             user=request.user,
@@ -978,7 +1080,12 @@ class CheckOutView(APIView):
             notes=notes,
             additional_data={
                 'overtime_minutes': booking.overtime_minutes,
-                'overtime_amount': str(booking.overtime_amount)
+                'overtime_amount': str(booking.overtime_amount),
+                'latitude': float(user_latitude),
+                'longitude': float(user_longitude),
+                'distance_from_parking': distance,
+                'within_allowed_area': is_within,
+                'parking_location': location_name
             }
         )
         
