@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { checkInBooking, checkOutBooking } from '../services/bookingslot';
+import { getUserLocation, formatDistance } from '../services/geolocation';
 import Toast from './Toast';
 import '../stylesheets/booking-card.css';
 
@@ -22,11 +23,38 @@ export default function EnhancedBookingCard({
   const handleCheckIn = async () => {
     try {
       setActionLoading(true);
-      await checkInBooking(booking.id, '');
-      showToast('Successfully checked in!', 'success');
+      
+      // Show loading message
+      showToast('Getting your location...', 'info');
+      
+      // Get user's GPS location
+      const location = await getUserLocation();
+      
+      showToast('Verifying location...', 'info');
+      
+      // Call API with location data
+      await checkInBooking(booking.id, '', location);
+      
+      showToast('✅ Successfully checked in!', 'success');
       if (onStatusChange) onStatusChange();
     } catch (error) {
-      const errorMessage = error.response?.data?.error || 'Failed to check in';
+      console.error('Check-in error:', error);
+      
+      // Handle location errors
+      if (error.message && error.message.includes('location')) {
+        showToast(`❌ ${error.message}`, 'error');
+        return;
+      }
+      
+      // Handle API errors
+      const errorData = error.response?.data;
+      let errorMessage = errorData?.error || errorData?.message || 'Failed to check in';
+      
+      // If location verification failed (403)
+      if (error.response?.status === 403 && errorData?.distance_meters) {
+        errorMessage = `❌ ${errorData.message}\n\nYou are ${formatDistance(errorData.distance_meters)} away from the parking area.`;
+      }
+      
       showToast(errorMessage, 'error');
     } finally {
       setActionLoading(false);
@@ -36,17 +64,43 @@ export default function EnhancedBookingCard({
   const handleCheckOut = async () => {
     try {
       setActionLoading(true);
-      const result = await checkOutBooking(booking.id, '');
       
-      let message = 'Successfully checked out!';
+      // Show loading message
+      showToast('Getting your location...', 'info');
+      
+      // Get user's GPS location
+      const location = await getUserLocation();
+      
+      showToast('Verifying location...', 'info');
+      
+      // Call API with location data
+      const result = await checkOutBooking(booking.id, '', location);
+      
+      let message = '✅ Successfully checked out!';
       if (result.overtime_charge && parseFloat(result.overtime_charge) > 0) {
-        message += ` Overtime charge: $${result.overtime_charge}`;
+        message += `\n\n⏱️ Overtime charge: $${result.overtime_charge}`;
       }
       
       showToast(message, 'success');
       if (onStatusChange) onStatusChange();
     } catch (error) {
-      const errorMessage = error.response?.data?.error || 'Failed to check out';
+      console.error('Check-out error:', error);
+      
+      // Handle location errors
+      if (error.message && error.message.includes('location')) {
+        showToast(`❌ ${error.message}`, 'error');
+        return;
+      }
+      
+      // Handle API errors
+      const errorData = error.response?.data;
+      let errorMessage = errorData?.error || errorData?.message || 'Failed to check out';
+      
+      // If location verification failed (403)
+      if (error.response?.status === 403 && errorData?.distance_meters) {
+        errorMessage = `❌ ${errorData.message}\n\nYou are ${formatDistance(errorData.distance_meters)} away from the parking area.`;
+      }
+      
       showToast(errorMessage, 'error');
     } finally {
       setActionLoading(false);

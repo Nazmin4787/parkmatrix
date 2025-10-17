@@ -151,13 +151,21 @@ export async function getActiveBooking() {
   }
 }
 
-export async function checkInBooking(bookingId, notes = '') {
+export async function checkInBooking(bookingId, notes = '', location = null) {
   try {
     console.log(`Checking in booking ${bookingId}...`);
     const requestData = {};
     if (notes) {
       requestData.notes = notes;
     }
+    
+    // Add location data (required by backend)
+    if (location) {
+      requestData.latitude = location.latitude;
+      requestData.longitude = location.longitude;
+    }
+    
+    console.log('Check-in request data:', requestData);
     const response = await http.post(`/api/bookings/${bookingId}/checkin/`, requestData);
     console.log('Check-in response:', response);
     return response.data;
@@ -171,13 +179,21 @@ export async function checkInBooking(bookingId, notes = '') {
   }
 }
 
-export async function checkOutBooking(bookingId, notes = '') {
+export async function checkOutBooking(bookingId, notes = '', location = null) {
   try {
     console.log(`Checking out booking ${bookingId}...`);
     const requestData = {};
     if (notes) {
       requestData.notes = notes;
     }
+    
+    // Add location data (required by backend)
+    if (location) {
+      requestData.latitude = location.latitude;
+      requestData.longitude = location.longitude;
+    }
+    
+    console.log('Check-out request data:', requestData);
     const response = await http.post(`/api/bookings/${bookingId}/checkout/`, requestData);
     console.log('Check-out response:', response);
     return response.data;

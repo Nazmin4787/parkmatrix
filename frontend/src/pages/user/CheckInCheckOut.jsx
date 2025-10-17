@@ -5,16 +5,25 @@ import {
   checkInBooking, 
   checkOutBooking 
 } from '../../services/bookingslot';
+import { 
+  getUserLocation, 
+  isWithinParkingArea,
+  formatDistance,
+  PARKING_CENTER
+} from '../../services/geolocation';
 import Toast from '../../UIcomponents/Toast';
 
 const CheckInCheckOut = () => {
   const [activeBooking, setActiveBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [showNotesInput, setShowNotesInput] = useState(false);
   const [actionType, setActionType] = useState(''); // 'checkin' or 'checkout'
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationError, setLocationError] = useState(null);
 
   useEffect(() => {
     fetchActiveBooking();
@@ -40,22 +49,79 @@ const CheckInCheckOut = () => {
     setTimeout(() => setToast({ show: false, message: '', type: '' }), 5000);
   };
 
+  const fetchUserLocation = async () => {
+    try {
+      setLocationLoading(true);
+      setLocationError(null);
+      
+      const location = await getUserLocation();
+      const validation = isWithinParkingArea(location.latitude, location.longitude);
+      
+      setUserLocation({
+        ...location,
+        ...validation
+      });
+      
+      // Show warning if outside parking area
+      if (!validation.isWithin) {
+        showToast(
+          `⚠️ You are ${formatDistance(validation.distance)} away from the parking area. You must be within ${formatDistance(validation.allowedRadius)} to check in/out.`,
+          'warning'
+        );
+      } else {
+        showToast(
+          `📍 Location verified! You are ${formatDistance(validation.distance)} from parking center.`,
+          'success'
+        );
+      }
+      
+      return location;
+    } catch (error) {
+      console.error('Location error:', error);
+      setLocationError(error.message);
+      showToast(error.message, 'error');
+      throw error;
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   const handleCheckIn = async () => {
     if (!activeBooking) return;
     
     try {
       setActionLoading(true);
-      const result = await checkInBooking(activeBooking.id, notes);
       
-      showToast('Successfully checked in!', 'success');
+      // Get user location first
+      const location = await fetchUserLocation();
+      
+      // Call API with location
+      const result = await checkInBooking(activeBooking.id, notes, location);
+      
+      showToast('✅ Successfully checked in!', 'success');
       setNotes('');
       setShowNotesInput(false);
+      setUserLocation(null);
       
       // Refresh active booking data
       await fetchActiveBooking();
     } catch (error) {
       console.error('Check-in error:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to check in';
+      
+      // Handle different error types
+      if (error.message && error.message.includes('location')) {
+        // Location error already shown by fetchUserLocation
+        return;
+      }
+      
+      const errorData = error.response?.data;
+      let errorMessage = errorData?.error || errorData?.message || 'Failed to check in';
+      
+      // If location verification failed (403)
+      if (error.response?.status === 403 && errorData?.distance_meters) {
+        errorMessage = `❌ ${errorData.message}\n\nYou are ${formatDistance(errorData.distance_meters)} away from the parking area.`;
+      }
+      
       showToast(errorMessage, 'error');
     } finally {
       setActionLoading(false);
@@ -67,22 +133,42 @@ const CheckInCheckOut = () => {
     
     try {
       setActionLoading(true);
-      const result = await checkOutBooking(activeBooking.id, notes);
       
-      let message = 'Successfully checked out!';
+      // Get user location first
+      const location = await fetchUserLocation();
+      
+      // Call API with location
+      const result = await checkOutBooking(activeBooking.id, notes, location);
+      
+      let message = '✅ Successfully checked out!';
       if (result.overtime_charge && parseFloat(result.overtime_charge) > 0) {
-        message += ` Overtime charge: $${result.overtime_charge}`;
+        message += `\n\n⏱️ Overtime charge: $${result.overtime_charge}`;
       }
       
       showToast(message, 'success');
       setNotes('');
       setShowNotesInput(false);
+      setUserLocation(null);
       
       // Refresh active booking data
       await fetchActiveBooking();
     } catch (error) {
       console.error('Check-out error:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to check out';
+      
+      // Handle different error types
+      if (error.message && error.message.includes('location')) {
+        // Location error already shown by fetchUserLocation
+        return;
+      }
+      
+      const errorData = error.response?.data;
+      let errorMessage = errorData?.error || errorData?.message || 'Failed to check out';
+      
+      // If location verification failed (403)
+      if (error.response?.status === 403 && errorData?.distance_meters) {
+        errorMessage = `❌ ${errorData.message}\n\nYou are ${formatDistance(errorData.distance_meters)} away from the parking area.`;
+      }
+      
       showToast(errorMessage, 'error');
     } finally {
       setActionLoading(false);
@@ -204,24 +290,115 @@ const CheckInCheckOut = () => {
 
       {/* Action Buttons */}
       {!showNotesInput && (
-        <div className="flex gap-4">
-          {activeBooking.status === 'confirmed' && (
+        <div className="space-y-4">
+          {/* Location Status Indicator */}
+          {userLocation && (
+            <div className={`p-3 rounded-lg border ${
+              userLocation.isWithin 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {userLocation.isWithin ? (
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  <div>
+                    <p className={`text-sm font-medium ${
+                      userLocation.isWithin ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {userLocation.isWithin 
+                        ? '✓ Within parking area' 
+                        : '✗ Outside parking area'}
+                    </p>
+                    <p className={`text-xs ${
+                      userLocation.isWithin ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {formatDistance(userLocation.distance)} from parking center
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchUserLocation}
+                  disabled={locationLoading}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Check Location Button */}
+          {!userLocation && (
             <button
-              onClick={() => initiateAction('checkin')}
-              className="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+              onClick={fetchUserLocation}
+              disabled={locationLoading}
+              className="w-full px-4 py-2 border-2 border-blue-500 text-blue-600 rounded-md hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
             >
-              Check In
+              {locationLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span>Getting your location...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>Verify Location</span>
+                </>
+              )}
             </button>
+          )}
+
+          {/* Location Error */}
+          {locationError && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-yellow-800">Location Access Required</p>
+                  <p className="text-xs text-yellow-700 mt-1">{locationError}</p>
+                </div>
+              </div>
+            </div>
           )}
           
-          {activeBooking.status === 'checked_in' && (
-            <button
-              onClick={() => initiateAction('checkout')}
-              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Check Out
-            </button>
-          )}
+          <div className="flex gap-4">
+            {activeBooking.status === 'confirmed' && (
+              <button
+                onClick={() => initiateAction('checkin')}
+                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                Check In
+              </button>
+            )}
+            
+            {activeBooking.status === 'checked_in' && (
+              <button
+                onClick={() => initiateAction('checkout')}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Check Out
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -233,9 +410,23 @@ const CheckInCheckOut = () => {
           className="border rounded-lg p-4 bg-blue-50"
         >
           <h5 className="font-medium text-gray-800 mb-3">
-            {actionType === 'checkin' ? 'Check-in' : 'Check-out'} Notes (Optional)
+            {actionType === 'checkin' ? '📍 Check-in' : '📍 Check-out'} Confirmation
           </h5>
           
+          <div className="mb-4 p-3 bg-blue-100 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 flex items-start gap-2">
+              <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                Your location will be verified when you confirm. Please ensure you are at the parking area.
+              </span>
+            </p>
+          </div>
+
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Notes (Optional)
+          </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -257,10 +448,16 @@ const CheckInCheckOut = () => {
               {actionLoading ? (
                 <span className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Processing...
+                  {locationLoading ? 'Verifying location...' : 'Processing...'}
                 </span>
               ) : (
-                `Confirm ${actionType === 'checkin' ? 'Check-in' : 'Check-out'}`
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {`Confirm ${actionType === 'checkin' ? 'Check-in' : 'Check-out'}`}
+                </span>
               )}
             </button>
             
