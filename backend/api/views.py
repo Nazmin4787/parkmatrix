@@ -1571,3 +1571,97 @@ class SlotStatisticsView(APIView):
             'slot_statistics': list(slot_stats),
             'booking_statistics': list(booking_stats)
         })
+
+
+class NearestParkingView(APIView):
+    """
+    API endpoint to get nearest parking locations based on user's GPS coordinates.
+    
+    GET /api/parking/nearest/?latitude=19.2479&longitude=73.1471&max_results=5
+    
+    Query Parameters:
+    - latitude (required): User's current latitude
+    - longitude (required): User's current longitude
+    - max_results (optional): Maximum number of locations to return (default: 10)
+    
+    Returns:
+    - List of parking locations sorted by distance (nearest first)
+    - Each location includes: name, coordinates, distance, available slots, etc.
+    """
+    permission_classes = [permissions.AllowAny]  # Allow any user to check nearest parking
+    
+    def get(self, request):
+        # Get query parameters
+        user_latitude = request.query_params.get('latitude')
+        user_longitude = request.query_params.get('longitude')
+        max_results = request.query_params.get('max_results', 10)
+        
+        # Validate required parameters
+        if not user_latitude or not user_longitude:
+            return Response({
+                'error': 'Missing required parameters',
+                'message': 'Please provide both latitude and longitude parameters.',
+                'example': '/api/parking/nearest/?latitude=19.2479&longitude=73.1471'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate and convert parameters
+        try:
+            user_lat = float(user_latitude)
+            user_lon = float(user_longitude)
+            max_results = int(max_results)
+            
+            # Validate latitude range (-90 to 90)
+            if not (-90 <= user_lat <= 90):
+                return Response({
+                    'error': 'Invalid latitude',
+                    'message': 'Latitude must be between -90 and 90 degrees.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate longitude range (-180 to 180)
+            if not (-180 <= user_lon <= 180):
+                return Response({
+                    'error': 'Invalid longitude',
+                    'message': 'Longitude must be between -180 and 180 degrees.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate max_results range (1 to 50)
+            if not (1 <= max_results <= 50):
+                max_results = 10  # Default to 10
+                
+        except ValueError as e:
+            return Response({
+                'error': 'Invalid parameter format',
+                'message': 'Latitude and longitude must be valid numbers.',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get nearest parking locations
+        try:
+            from .utils import get_nearest_parking_locations
+            
+            nearest_locations = get_nearest_parking_locations(
+                user_lat, 
+                user_lon, 
+                max_results
+            )
+            
+            # Serialize the data
+            from .serializers import NearestParkingLocationSerializer
+            serializer = NearestParkingLocationSerializer(nearest_locations, many=True)
+            
+            return Response({
+                'success': True,
+                'user_location': {
+                    'latitude': user_lat,
+                    'longitude': user_lon
+                },
+                'total_locations': len(nearest_locations),
+                'locations': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({
+                'error': 'Server error',
+                'message': 'An error occurred while fetching nearest parking locations.',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -10,6 +10,7 @@ from .views import (
     MarkAllNotificationsAsReadView, SystemAlertCreateView, MaintenanceAlertCreateView, SystemNotificationStatusView,
     APIRootView, SlotManagementView, BulkSlotUpdateView, SlotStatisticsView,
     CheckInView, CheckOutView, ActiveBookingView,
+    NearestParkingView,  # NEW: Import the new view
 )
 from .notification_public_views import PublicNotificationUnreadCountView
 from .receipt_views import GenerateReceiptView
@@ -70,6 +71,9 @@ urlpatterns = [
     # Parking search endpoints
     path('parking-lots/nearest/', parking_search.NearestParkingLotsView.as_view(), name='nearest-parking-lots'),
     path('parking-lots/search/', parking_search.search_parking_by_address, name='search-parking-by-address'),
+    
+    # NEW: Nearest parking locations endpoint (GPS-based)
+    path('parking/nearest/', NearestParkingView.as_view(), name='nearest-parking-locations'),
 
     # Admin slot management
     path('admin/slots/', views.SlotManagementView.as_view(), name='admin-slot-management'),

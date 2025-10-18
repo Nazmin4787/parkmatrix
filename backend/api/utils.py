@@ -13,12 +13,44 @@ COLLEGE_PARKING_CENTER = {
     "name": "College Parking"
 }
 
+# ============================================
+# PARKING LOCATION CONFIGURATION
+# ============================================
+COLLEGE_PARKING_CENTER = {
+    "lat": 19.2479,
+    "lon": 73.1471,
+    "radius_meters": 500,  # Adjust based on your campus size (500m = ~0.31 miles)
+    "name": "College Parking"
+}
+
 HOME_PARKING_CENTER = {
     "lat": 19.2056,
     "lon": 73.1556,
-    "radius_meters": 50,  # 50 meters radius for home parking
+    "radius_meters": 500,  # 500 meters radius for home parking
     "name": "Home Parking"
 }
+
+METRO_PARKING_CENTER = {
+    "lat": 19.2291,
+    "lon": 73.1233,
+    "radius_meters": 500,  # 500 meters radius for metro parking
+    "name": "Metro Parking"
+}
+
+VIVIVANA_PARKING_CENTER = {
+    "lat": 19.2088,
+    "lon": 72.9716,
+    "radius_meters": 500,  # 500 meters radius for Vivivana parking
+    "name": "Vivivana Parking"
+}
+
+# List of all valid parking locations
+PARKING_LOCATIONS = [
+    COLLEGE_PARKING_CENTER,
+    HOME_PARKING_CENTER,
+    METRO_PARKING_CENTER,
+    VIVIVANA_PARKING_CENTER
+]
 
 # List of all valid parking locations
 PARKING_LOCATIONS = [
@@ -245,3 +277,123 @@ def find_alternative_slots(slot, requested_start, requested_end, max_alternative
     
     # Limit to max alternatives and format datetime objects for easy display
     return alternatives[:max_alternatives]
+
+
+# ============================================
+# NEAREST PARKING LOCATION UTILITIES
+# ============================================
+def get_parking_location_by_name(location_name):
+    """
+    Get parking location configuration by name.
+    
+    Args:
+        location_name: Name of the parking location
+    
+    Returns:
+        dict: Parking location configuration or None
+    """
+    for location in PARKING_LOCATIONS:
+        if location.get("name") == location_name:
+            return location
+    return None
+
+
+def calculate_available_slots_by_location():
+    """
+    Calculate available slots for each parking location.
+    Groups slots by their geographic location based on PARKING_LOCATIONS.
+    
+    Returns:
+        list: List of dicts with location details and slot availability
+    """
+    from .models import ParkingSlot, Booking
+    from django.db.models import Q
+    
+    results = []
+    
+    for location in PARKING_LOCATIONS:
+        # Get all slots (you might need to filter by location if you add location field to ParkingSlot)
+        # For now, we'll assume all slots belong to all locations
+        # In future, add a location field to ParkingSlot model
+        
+        all_slots = ParkingSlot.objects.all()
+        total_slots = all_slots.count()
+        
+        # Get occupied slots (slots with active bookings)
+        now = timezone.now()
+        occupied_slots = ParkingSlot.objects.filter(
+            Q(is_occupied=True) |
+            Q(booking__start_time__lte=now,
+              booking__end_time__gte=now,
+              booking__is_active=True,
+              booking__status__in=['confirmed', 'checked_in'])
+        ).distinct().count()
+        
+        available_slots = total_slots - occupied_slots
+        
+        results.append({
+            'name': location['name'],
+            'latitude': location['lat'],
+            'longitude': location['lon'],
+            'radius_meters': location['radius_meters'],
+            'total_slots': total_slots,
+            'occupied_slots': occupied_slots,
+            'available_slots': max(0, available_slots),  # Ensure non-negative
+            'occupancy_percentage': round((occupied_slots / total_slots * 100) if total_slots > 0 else 0, 1)
+        })
+    
+    return results
+
+
+def get_nearest_parking_locations(user_lat, user_lon, max_results=10):
+    """
+    Get nearest parking locations sorted by distance from user.
+    
+    Args:
+        user_lat: User's latitude
+        user_lon: User's longitude
+        max_results: Maximum number of results to return (default: 10)
+    
+    Returns:
+        list: List of dicts with location details, distance, and availability
+    """
+    # Get availability data for all locations
+    locations_with_slots = calculate_available_slots_by_location()
+    
+    # Calculate distance for each location
+    for location in locations_with_slots:
+        distance_meters = calculate_distance(
+            user_lat, user_lon,
+            location['latitude'],
+            location['longitude']
+        )
+        location['distance_meters'] = round(distance_meters, 2)
+        location['distance_km'] = round(distance_meters / 1000, 2)
+        
+        # Calculate walking time (assume 5 km/h)
+        walking_speed_kmh = 5
+        location['walking_time_minutes'] = round((location['distance_km'] / walking_speed_kmh) * 60, 0)
+        
+        # Calculate driving time (assume 30 km/h in city)
+        driving_speed_kmh = 30
+        location['driving_time_minutes'] = round((location['distance_km'] / driving_speed_kmh) * 60, 0)
+        
+        # Add availability status
+        if location['available_slots'] == 0:
+            location['availability_status'] = 'full'
+            location['availability_color'] = 'red'
+        elif location['available_slots'] <= 5:
+            location['availability_status'] = 'limited'
+            location['availability_color'] = 'orange'
+        elif location['available_slots'] <= 10:
+            location['availability_status'] = 'moderate'
+            location['availability_color'] = 'yellow'
+        else:
+            location['availability_status'] = 'available'
+            location['availability_color'] = 'green'
+    
+    # Sort by distance (nearest first)
+    locations_with_slots.sort(key=lambda x: x['distance_meters'])
+    
+    # Return limited results
+    return locations_with_slots[:max_results]

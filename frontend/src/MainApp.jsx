@@ -13,6 +13,7 @@ import SimpleBookingsList from './pages/user/SimpleBookingsList';
 import UserDebug from './pages/user/UserDebug';
 import BookingFlow from './pages/user/BookingFlow';
 import CheckInCheckOut from './pages/user/CheckInCheckOut';
+import NearestParking from './pages/user/NearestParking';
 import Phase8TestPage from './pages/Phase8TestPage';
 import ManageSlots from './pages/administration/ManageSlots';
 import EditSlot from './pages/administration/EditSlot';
@@ -56,6 +57,7 @@ export default function MainApp() {
         <Route path="/admin/slots/:id/edit" element={<Guard roles={['admin']}><EditSlot /></Guard>} />
         <Route path="/admin/bookings" element={<Guard roles={['admin']}><AdminListBookings /></Guard>} />
 
+        <Route path="/nearest-parking" element={<NearestParking />} />
         <Route path="/parking-map" element={<ParkingMap />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

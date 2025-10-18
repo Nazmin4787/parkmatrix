@@ -16,7 +16,7 @@ export default function Navbar() {
 
         <nav className="nav-links">
           <Link to="/">Home</Link>
-          <Link to="/parking-map">Parking Map</Link>
+          <Link to="/nearest-parking">📍 Nearest Parking</Link>
           {user?.role === 'customer' && <Link to="/slots">Available Slots</Link>}
           {user?.role === 'customer' && <Link to="/bookings">My Bookings</Link>}
           {user?.role === 'admin' && <Link to="/admin">Admin</Link>}

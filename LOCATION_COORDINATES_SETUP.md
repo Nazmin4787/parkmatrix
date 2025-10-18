@@ -1,6 +1,6 @@
 # 📍 PARKING LOCATIONS - QUICK REFERENCE
 
-## Current Setup (October 17, 2025)
+## Current Setup (October 18, 2025)
 
 ### 🎓 Location 1: College Parking
 ```
@@ -16,6 +16,22 @@ Coordinates: 19.2056, 73.1556
 Radius:      500 meters
 Name:        "Home Parking"
 Google Maps: https://www.google.com/maps?q=19.2056,73.1556
+```
+
+### 🚇 Location 3: Metro Parking
+```
+Coordinates: 19.2291, 73.1233
+Radius:      500 meters
+Name:        "Metro Parking"
+Google Maps: https://www.google.com/maps?q=19.2291,73.1233
+```
+
+### 🏢 Location 4: Vivivana Parking
+```
+Coordinates: 19.2088, 72.9716
+Radius:      500 meters
+Name:        "Vivivana Parking"
+Google Maps: https://www.google.com/maps?q=19.2088,72.9716
 ```
 
 ---
@@ -38,9 +54,25 @@ HOME_PARKING_CENTER = {
     "name": "Home Parking"
 }
 
+METRO_PARKING_CENTER = {
+    "lat": 19.2291,
+    "lon": 73.1233,
+    "radius_meters": 500,
+    "name": "Metro Parking"
+}
+
+VIVIVANA_PARKING_CENTER = {
+    "lat": 19.2088,
+    "lon": 72.9716,
+    "radius_meters": 500,
+    "name": "Vivivana Parking"
+}
+
 PARKING_LOCATIONS = [
     COLLEGE_PARKING_CENTER,
-    HOME_PARKING_CENTER
+    HOME_PARKING_CENTER,
+    METRO_PARKING_CENTER,
+    VIVIVANA_PARKING_CENTER
 ]
 ```
 
@@ -60,9 +92,25 @@ export const HOME_PARKING_CENTER = {
   name: 'Home Parking'
 };
 
+export const METRO_PARKING_CENTER = {
+  lat: 19.2291,
+  lon: 73.1233,
+  radius_meters: 500,
+  name: 'Metro Parking'
+};
+
+export const VIVIVANA_PARKING_CENTER = {
+  lat: 19.2088,
+  lon: 72.9716,
+  radius_meters: 500,
+  name: 'Vivivana Parking'
+};
+
 export const PARKING_LOCATIONS = [
   COLLEGE_PARKING_CENTER,
-  HOME_PARKING_CENTER
+  HOME_PARKING_CENTER,
+  METRO_PARKING_CENTER,
+  VIVIVANA_PARKING_CENTER
 ];
 ```
 
@@ -123,7 +171,9 @@ Should show both locations in the output.
 
 - ✅ **Within 500m** of College → Check-in allowed
 - ✅ **Within 500m** of Home → Check-in allowed
-- ❌ **Outside both** → Shows distance to nearest location
+- ✅ **Within 500m** of Metro → Check-in allowed
+- ✅ **Within 500m** of Vivivana → Check-in allowed
+- ❌ **Outside all 4 locations** → Shows distance to nearest location
 
 ---
 
@@ -163,6 +213,6 @@ export const PARKING_LOCATIONS = [
 
 ---
 
-**Last Updated:** October 17, 2025  
+**Last Updated:** October 18, 2025  
 **Status:** ✅ Multi-location support active  
-**Locations:** 2 (College + Home)
+**Locations:** 4 (College + Home + Metro + Vivivana)

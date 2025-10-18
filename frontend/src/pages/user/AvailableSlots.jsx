@@ -617,25 +617,6 @@ export default function AvailableSlots() {
           ))}
         </div>
       )}
-      
-      {/* Debug info - will show in development only */}
-      {import.meta.env.DEV && (
-        <div style={{ marginTop: '20px', padding: '10px', border: '1px dashed #ccc' }}>
-          <h3>Debug Information</h3>
-          <p>Loading state: {isLoading ? 'true' : 'false'}</p>
-          <p>Selected vehicle type: {selectedVehicleType || 'none'}</p>
-          <p>Default vehicle type: {userDefaultVehicleType || 'none'}</p>
-          <p>Slots data type: {typeof slots}</p>
-          <p>Slots structure: {slots && slots.slots ? 'Has slots property' : (Array.isArray(slots) ? 'Is array' : 'Unknown')}</p>
-          <p>Number of slots: {Array.isArray(slots) ? slots.length : (slots && slots.slots ? slots.slots.length : 0)}</p>
-          <p>Number of filtered slots: {filtered ? filtered.length : 0}</p>
-          <p>Enhanced Modal Open: {enhancedModal.open ? 'true' : 'false'}</p>
-          <p>Enhanced Modal Slot ID: {enhancedModal.slotId || 'none'}</p>
-          <p>User Vehicles Count: {userVehicles ? userVehicles.length : 0}</p>
-          {message && <p>Message: {message}</p>}
-          {slots && !Array.isArray(slots) && <p>Raw slots data: {JSON.stringify(slots).substring(0, 150)}...</p>}
-        </div>
-      )}
 
       {/* Enhanced Booking Modal */}
       {enhancedModal.open && (

@@ -350,3 +350,29 @@ class AuditLogSerializer(serializers.ModelSerializer):
                 'vehicle': obj.booking.vehicle.number_plate if obj.booking.vehicle else None
             }
         return None
+
+
+class NearestParkingLocationSerializer(serializers.Serializer):
+    """
+    Serializer for nearest parking location information.
+    Used to display parking locations with distance and availability.
+    """
+    name = serializers.CharField(max_length=100)
+    latitude = serializers.FloatField()
+    longitude = serializers.FloatField()
+    radius_meters = serializers.IntegerField()
+    distance_meters = serializers.FloatField()
+    distance_km = serializers.FloatField()
+    walking_time_minutes = serializers.IntegerField()
+    driving_time_minutes = serializers.IntegerField()
+    total_slots = serializers.IntegerField()
+    occupied_slots = serializers.IntegerField()
+    available_slots = serializers.IntegerField()
+    occupancy_percentage = serializers.FloatField()
+    availability_status = serializers.CharField(max_length=20)
+    availability_color = serializers.CharField(max_length=20)
+    
+    # Optional fields that can be added later
+    address = serializers.CharField(max_length=255, required=False, allow_null=True)
+    price_per_hour = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    amenities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)

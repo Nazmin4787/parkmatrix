@@ -22,10 +22,26 @@ HOME_PARKING_CENTER = {
     "name": "Home Parking"
 }
 
+METRO_PARKING_CENTER = {
+    "lat": 19.2291,
+    "lon": 73.1233,
+    "radius_meters": 500,  # 500 meters radius for metro parking
+    "name": "Metro Parking"
+}
+
+VIVIVANA_PARKING_CENTER = {
+    "lat": 19.2088,
+    "lon": 72.9716,
+    "radius_meters": 500,  # 500 meters radius for Vivivana parking
+    "name": "Vivivana Parking"
+}
+
 # List of all valid parking locations
 PARKING_LOCATIONS = [
     COLLEGE_PARKING_CENTER,
-    HOME_PARKING_CENTER
+    HOME_PARKING_CENTER,
+    METRO_PARKING_CENTER,
+    VIVIVANA_PARKING_CENTER
 ]
 
 
