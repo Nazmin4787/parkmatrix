@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, ParkingSlot, Booking, PricingRate, Vehicle, ParkingLot
+from .models import User, ParkingSlot, Booking, PricingRate, Vehicle, ParkingLot, AccessLog
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -54,3 +54,26 @@ class BookingAdmin(admin.ModelAdmin):
 class PricingRateAdmin(admin.ModelAdmin):
     list_display = ('rate_name', 'hourly_rate', 'daily_rate', 'vehicle_type', 'is_default')
     list_filter = ('vehicle_type', 'is_default')
+
+
+@admin.register(AccessLog)
+class AccessLogAdmin(admin.ModelAdmin):
+    list_display = ('username', 'role', 'login_timestamp', 'logout_timestamp', 'ip_address', 'location_city', 'status', 'device_type')
+    list_filter = ('status', 'role', 'device_type', 'login_timestamp')
+    search_fields = ('username', 'email', 'ip_address', 'location_city', 'location_country')
+    readonly_fields = (
+        'user', 'username', 'email', 'role', 'login_timestamp', 'logout_timestamp',
+        'ip_address', 'location_city', 'location_country', 'latitude', 'longitude',
+        'status', 'failure_reason', 'user_agent', 'device_type', 'browser',
+        'operating_system', 'session_id'
+    )
+    date_hierarchy = 'login_timestamp'
+    ordering = ('-login_timestamp',)
+    
+    def has_add_permission(self, request):
+        # Prevent manual addition of access logs
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        # Only superusers can delete access logs
+        return request.user.is_superuser

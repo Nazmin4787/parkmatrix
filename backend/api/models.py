@@ -405,3 +405,76 @@ class Notification(models.Model):
     
     def __str__(self):
         return f"{self.notification_type}: {self.title}"
+
+
+# Access Log model for tracking user login/logout activity
+class AccessLog(models.Model):
+    STATUS_CHOICES = (
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+        ('locked', 'Account Locked'),
+    )
+    
+    DEVICE_TYPE_CHOICES = (
+        ('desktop', 'Desktop'),
+        ('mobile', 'Mobile'),
+        ('tablet', 'Tablet'),
+        ('unknown', 'Unknown'),
+    )
+    
+    # User information
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='access_logs', null=True, blank=True)
+    username = models.CharField(max_length=150, blank=True, help_text="Username at time of login attempt")
+    email = models.EmailField(blank=True, help_text="Email used for login attempt")
+    role = models.CharField(max_length=10, blank=True, help_text="User role (customer/admin/security)")
+    
+    # Timestamps
+    login_timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    logout_timestamp = models.DateTimeField(null=True, blank=True)
+    
+    # Network information
+    ip_address = models.GenericIPAddressField(null=True, blank=True, help_text="IP address of login attempt")
+    location_city = models.CharField(max_length=100, blank=True, help_text="City from IP geolocation")
+    location_country = models.CharField(max_length=100, blank=True, help_text="Country from IP geolocation")
+    latitude = models.FloatField(null=True, blank=True, help_text="GPS latitude (if available)")
+    longitude = models.FloatField(null=True, blank=True, help_text="GPS longitude (if available)")
+    
+    # Login status
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='success', db_index=True)
+    failure_reason = models.TextField(blank=True, help_text="Reason for failed login")
+    
+    # Device information
+    user_agent = models.TextField(blank=True, help_text="Browser/device user agent string")
+    device_type = models.CharField(max_length=10, choices=DEVICE_TYPE_CHOICES, default='unknown')
+    browser = models.CharField(max_length=50, blank=True)
+    operating_system = models.CharField(max_length=50, blank=True)
+    
+    # Session tracking
+    session_id = models.CharField(max_length=255, blank=True, help_text="Session ID for logout tracking")
+    
+    class Meta:
+        ordering = ['-login_timestamp']
+        indexes = [
+            models.Index(fields=['user', 'login_timestamp']),
+            models.Index(fields=['status', 'login_timestamp']),
+            models.Index(fields=['ip_address']),
+        ]
+        verbose_name = 'Access Log'
+        verbose_name_plural = 'Access Logs'
+    
+    def __str__(self):
+        status_icon = "✓" if self.status == 'success' else "✗"
+        return f"{status_icon} {self.username} ({self.role}) - {self.login_timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+    
+    @property
+    def session_duration(self):
+        """Calculate session duration in minutes"""
+        if self.logout_timestamp and self.login_timestamp:
+            delta = self.logout_timestamp - self.login_timestamp
+            return int(delta.total_seconds() / 60)
+        return None
+    
+    @property
+    def is_active_session(self):
+        """Check if session is still active (no logout timestamp)"""
+        return self.logout_timestamp is None and self.status == 'success'

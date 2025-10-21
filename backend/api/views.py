@@ -511,6 +511,8 @@ class LoginView(generics.GenericAPIView):
     serializer_class = LoginSerializer
     
     def post(self, request, *args, **kwargs):
+        from .access_log_utils import create_access_log
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
@@ -526,13 +528,26 @@ class LoginView(generics.GenericAPIView):
         user = authenticate(request, username=email, password=password)
         
         if user is None:
+            # Log failed login attempt
+            create_access_log(
+                user=None,
+                request=request,
+                status='failed',
+                failure_reason='Invalid credentials'
+            )
             return Response({
                 'error': 'Invalid credentials'
             }, status=status.HTTP_401_UNAUTHORIZED)
         
         # Check if email is verified (skip in development)
-        
         if not user.is_email_verified and not getattr(settings, 'SKIP_EMAIL_VERIFICATION', False):
+            # Log failed login attempt (email not verified)
+            create_access_log(
+                user=user,
+                request=request,
+                status='failed',
+                failure_reason='Email not verified'
+            )
             # NOTE: Email sending is disabled. In-app notifications will be used instead.
             # from .email_service import send_email_verification_email
             # send_email_verification_email(user, request)
@@ -547,10 +562,49 @@ class LoginView(generics.GenericAPIView):
         # Create custom tokens manually
         refresh = CustomRefreshToken.for_user(user)
         
+        # Generate session ID from refresh token
+        session_id = str(refresh)[:50]  # Use part of refresh token as session ID
+        
+        # Log successful login
+        create_access_log(
+            user=user,
+            request=request,
+            status='success',
+            session_id=session_id
+        )
+        
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
+            'session_id': session_id,  # Return session_id for logout tracking
         }, status=status.HTTP_200_OK)
+
+
+# Logout view to track logout time
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        from .access_log_utils import update_logout
+        
+        # Get session_id from request
+        session_id = request.data.get('session_id', '')
+        
+        if session_id:
+            # Update logout timestamp in access log
+            access_log = update_logout(session_id)
+            
+            if access_log:
+                return Response({
+                    'message': 'Logged out successfully',
+                    'session_duration': access_log.session_duration
+                }, status=status.HTTP_200_OK)
+        
+        # If no session_id or not found, still return success
+        return Response({
+            'message': 'Logged out successfully'
+        }, status=status.HTTP_200_OK)
+
 
 # JWT Token Refresh view
 class TokenRefreshView(APIView):
@@ -1171,44 +1225,45 @@ class ActiveBookingView(APIView):
         }, status=status.HTTP_404_NOT_FOUND)
 
 
-# Admin: View all bookings
-class AdminAllBookingsView(generics.ListAPIView):
-    queryset = Booking.objects.all().order_by('-start_time')
-    serializer_class = BookingSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+# REMOVED: View Bookings feature - commenting out for potential future use
+# # Admin: View all bookings
+# class AdminAllBookingsView(generics.ListAPIView):
+#     queryset = Booking.objects.all().order_by('-start_time')
+#     serializer_class = BookingSerializer
+#     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
-# Admin: Cancel any booking
-class AdminCancelBookingView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+# # Admin: Cancel any booking
+# class AdminCancelBookingView(APIView):
+#     permission_classes = [permissions.IsAuthenticated, IsAdminUser]
 
-    def post(self, request, pk):
-        try:
-            booking = Booking.objects.get(pk=pk)
-        except Booking.DoesNotExist:
-            return Response({"error": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
+#     def post(self, request, pk):
+#         try:
+#             booking = Booking.objects.get(pk=pk)
+#         except Booking.DoesNotExist:
+#             return Response({"error": "Booking not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if booking.is_active:
-            booking.is_active = False
-            booking.status = 'cancelled'
-            booking.end_time = timezone.now()
-            booking.save()
-            # Free the parking slot
-            booking.slot.is_occupied = False
-            booking.slot.save()
+#         if booking.is_active:
+#             booking.is_active = False
+#             booking.status = 'cancelled'
+#             booking.end_time = timezone.now()
+#             booking.save()
+#             # Free the parking slot
+#             booking.slot.is_occupied = False
+#             booking.slot.save()
             
-            # Create notification for the user whose booking was cancelled by admin
-            Notification.objects.create(
-                user=booking.user,
-                notification_type='booking_cancelled',
-                title='Booking Cancelled by Admin',
-                message=f'Your booking for slot {booking.slot.slot_number} has been cancelled by an administrator.',
-                related_object_id=str(booking.id),
-                related_object_type='Booking'
-            )
+#             # Create notification for the user whose booking was cancelled by admin
+#             Notification.objects.create(
+#                 user=booking.user,
+#                 notification_type='booking_cancelled',
+#                 title='Booking Cancelled by Admin',
+#                 message=f'Your booking for slot {booking.slot.slot_number} has been cancelled by an administrator.',
+#                 related_object_id=str(booking.id),
+#                 related_object_type='Booking'
+#             )
             
-            return Response({"message": "Booking cancelled successfully."}, status=status.HTTP_200_OK)
-        else:
-            return Response({"message": "Booking is already inactive."}, status=status.HTTP_400_BAD_REQUEST)
+#             return Response({"message": "Booking cancelled successfully."}, status=status.HTTP_200_OK)
+#         else:
+#             return Response({"message": "Booking is already inactive."}, status=status.HTTP_400_BAD_REQUEST)
 
 # Find parking lots by user location
 class ParkingLotsByLocationView(generics.ListAPIView):

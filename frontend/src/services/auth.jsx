@@ -29,6 +29,10 @@ export async function loginUser({ email, password }) {
     console.log('Login response received:', response);
     
     if (response.data) {
+      // Store session_id for logout tracking
+      if (response.data.session_id) {
+        localStorage.setItem('session_id', response.data.session_id);
+      }
       return response.data;
     } else {
       throw new Error('Empty response received from server');
@@ -53,6 +57,43 @@ export async function loginUser({ email, password }) {
       console.error('Request setup error:', error.message);
       throw error;
     }
+  }
+}
+
+export async function logoutUser() {
+  try {
+    const session_id = localStorage.getItem('session_id');
+    const access_token = localStorage.getItem('access_token');
+    
+    if (session_id && access_token) {
+      // Call logout endpoint to update logout timestamp
+      await axios({
+        method: 'post',
+        url: `${BASE_URL}/api/auth/logout/`,
+        data: { session_id },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${access_token}`
+        }
+      });
+    }
+    
+    // Clear all session data
+    localStorage.removeItem('session_id');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still clear local storage even if API call fails
+    localStorage.removeItem('session_id');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    
+    return { success: true };
   }
 }
 

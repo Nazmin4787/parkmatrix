@@ -1,11 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { clearSession, getCurrentUser } from '../store/userstore';
+import { logoutUser } from '../services/auth';
 import NotificationBell from './NotificationBell';
 import '../stylesheets/navbar.css';
 
 export default function Navbar() {
   const navigate = useNavigate();
   const user = getCurrentUser();
+  
+  async function handleLogout() {
+    // Call logout API to track logout time
+    await logoutUser();
+    // Clear local session
+    clearSession();
+    // Navigate to sign in
+    navigate('/signin');
+  }
+  
   return (
     <header className="navbar">
       <div className="navbar-inner">
@@ -28,7 +39,7 @@ export default function Navbar() {
           {!user && <Link className="btn-outline" to="/signin">Sign In</Link>}
           {!user && <Link className="btn-primary small" to="/signup">Sign Up</Link>}
           {user && (
-            <button className="btn-outline" onClick={() => { clearSession(); navigate('/signin'); }}>Sign Out</button>
+            <button className="btn-outline" onClick={handleLogout}>Sign Out</button>
           )}
         </div>
       </div>

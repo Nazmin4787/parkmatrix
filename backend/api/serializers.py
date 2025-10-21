@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification, AuditLog
+from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification, AuditLog, AccessLog
 from datetime import timedelta
 from django.utils import timezone
 
@@ -376,3 +376,438 @@ class NearestParkingLocationSerializer(serializers.Serializer):
     address = serializers.CharField(max_length=255, required=False, allow_null=True)
     price_per_hour = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     amenities = serializers.ListField(child=serializers.CharField(), required=False, allow_null=True)
+
+
+class AccessLogSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Access Log model with all details
+    """
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    session_duration = serializers.IntegerField(read_only=True, help_text="Session duration in minutes")
+    is_active_session = serializers.BooleanField(read_only=True)
+    
+    class Meta:
+        model = AccessLog
+        fields = [
+            'id', 'user', 'user_id', 'username', 'email', 'role',
+            'login_timestamp', 'logout_timestamp', 'session_duration',
+            'ip_address', 'location_city', 'location_country',
+            'latitude', 'longitude', 'status', 'failure_reason',
+            'user_agent', 'device_type', 'browser', 'operating_system',
+            'session_id', 'is_active_session'
+        ]
+        read_only_fields = [
+            'id', 'login_timestamp', 'session_duration', 'is_active_session'
+        ]
+
+
+class AccessLogListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for list view (excludes heavy fields)
+    """
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    session_duration = serializers.IntegerField(read_only=True)
+    is_active_session = serializers.BooleanField(read_only=True)
+    
+    class Meta:
+        model = AccessLog
+        fields = [
+            'id', 'user_id', 'username', 'role',
+            'login_timestamp', 'logout_timestamp', 'session_duration',
+            'ip_address', 'location_city', 'location_country',
+            'status', 'device_type', 'is_active_session'
+        ]
+
+
+class AccessLogStatsSerializer(serializers.Serializer):
+    """
+    Serializer for access log statistics
+    """
+    total_logins = serializers.IntegerField()
+    successful_logins = serializers.IntegerField()
+    failed_logins = serializers.IntegerField()
+    unique_users = serializers.IntegerField()
+    active_sessions = serializers.IntegerField()
+    logins_by_role = serializers.DictField()
+    logins_by_status = serializers.DictField()
+    recent_failed_attempts = serializers.ListField()
+
+
+# ============================================
+# Check-In/Check-Out Log Serializers
+# ============================================
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """
+    Detailed serializer for AuditLog (check-in/check-out logs)
+    """
+    booking_id = serializers.IntegerField(source='booking.id', read_only=True)
+    user_username = serializers.CharField(source='booking.user.username', read_only=True)
+    user_email = serializers.EmailField(source='booking.user.email', read_only=True)
+    vehicle_type = serializers.CharField(source='booking.vehicle.vehicle_type', read_only=True)
+    vehicle_plate = serializers.CharField(source='booking.vehicle.number_plate', read_only=True)
+    slot_number = serializers.CharField(source='booking.slot.slot_number', read_only=True)
+    floor = serializers.CharField(source='booking.slot.floor', read_only=True)
+    section = serializers.CharField(source='booking.slot.section', read_only=True)
+    parking_lot = serializers.CharField(source='booking.slot.parking_lot.name', read_only=True)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'booking_id', 'action', 'action_display', 'timestamp',
+            'user_username', 'user_email', 'vehicle_type', 'vehicle_plate',
+            'parking_lot', 'slot_number', 'floor', 'section',
+            'ip_address', 'user_agent', 'success', 'error_message', 
+            'notes', 'additional_data'
+        ]
+
+
+class AuditLogListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for AuditLog list view
+    """
+    booking_id = serializers.IntegerField(source='booking.id', read_only=True)
+    user_username = serializers.CharField(source='booking.user.username', read_only=True)
+    vehicle_type = serializers.CharField(source='booking.vehicle.vehicle_type', read_only=True)
+    vehicle_plate = serializers.CharField(source='booking.vehicle.number_plate', read_only=True)
+    slot_number = serializers.CharField(source='booking.slot.slot_number', read_only=True)
+    parking_lot = serializers.CharField(source='booking.slot.parking_lot.name', read_only=True)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'booking_id', 'action', 'action_display', 'timestamp',
+            'user_username', 'vehicle_type', 'vehicle_plate',
+            'parking_lot', 'slot_number', 'ip_address', 'status'
+        ]
+    
+    def get_status(self, obj):
+        return 'Success' if obj.success else 'Failed'
+
+
+class AuditLogStatsSerializer(serializers.Serializer):
+    """
+    Serializer for check-in/check-out statistics
+    """
+    total_check_ins = serializers.IntegerField()
+    failed_check_ins = serializers.IntegerField()
+    total_check_outs = serializers.IntegerField()
+    failed_check_outs = serializers.IntegerField()
+    currently_parked = serializers.IntegerField()
+    average_parking_duration_hours = serializers.FloatField()
+    total_completed_sessions = serializers.IntegerField()
+    check_ins_by_vehicle_type = serializers.DictField()
+    hourly_check_ins_today = serializers.ListField()
+    peak_hours = serializers.ListField()
+    recent_failed_attempts = serializers.ListField()
+
+
+class CurrentlyParkedVehicleSerializer(serializers.ModelSerializer):
+    """
+    Serializer for currently parked vehicles
+    """
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    vehicle_info = serializers.SerializerMethodField()
+    slot_info = serializers.SerializerMethodField()
+    duration_minutes = serializers.SerializerMethodField()
+    expected_checkout = serializers.DateTimeField(source='end_time', read_only=True)
+    is_overtime = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Booking
+        fields = [
+            'id', 'user_username', 'user_email', 'vehicle_info',
+            'slot_info', 'checked_in_at', 'expected_checkout',
+            'duration_minutes', 'is_overtime', 'overtime_minutes',
+            'check_in_notes'
+        ]
+    
+    def get_vehicle_info(self, obj):
+        if obj.vehicle:
+            return {
+                'type': obj.vehicle.vehicle_type,
+                'number_plate': obj.vehicle.number_plate,
+                'model': obj.vehicle.model,
+                'color': obj.vehicle.color
+            }
+        return None
+    
+    def get_slot_info(self, obj):
+        if obj.slot:
+            return {
+                'slot_number': obj.slot.slot_number,
+                'floor': obj.slot.floor,
+                'section': obj.slot.section,
+                'parking_lot': obj.slot.parking_lot.name if obj.slot.parking_lot else None
+            }
+        return None
+    
+    def get_duration_minutes(self, obj):
+        if obj.checked_in_at:
+            from django.utils import timezone
+            duration = timezone.now() - obj.checked_in_at
+            return int(duration.total_seconds() / 60)
+        return 0
+    
+    def get_is_overtime(self, obj):
+        if obj.end_time:
+            from django.utils import timezone
+            return timezone.now() > obj.end_time
+        return False
+
+
+# ============================================================================
+# FEATURE 2: USER PARKING HISTORY SERIALIZERS
+# ============================================================================
+
+class VehicleInfoSerializer(serializers.Serializer):
+    """Serializer for vehicle information in parking history"""
+    type = serializers.CharField()
+    plate = serializers.CharField()
+    model = serializers.CharField(required=False, allow_null=True)
+    color = serializers.CharField(required=False, allow_null=True)
+
+
+class LocationInfoSerializer(serializers.Serializer):
+    """Serializer for location information in parking history"""
+    name = serializers.CharField()
+    zone = serializers.CharField(required=False, allow_null=True)
+    floor = serializers.CharField(required=False, allow_null=True)
+    slot_number = serializers.CharField(required=False, allow_null=True)
+
+
+class TimingInfoSerializer(serializers.Serializer):
+    """Serializer for timing information in parking history"""
+    check_in = serializers.DateTimeField()
+    check_out = serializers.DateTimeField(required=False, allow_null=True)
+    duration_minutes = serializers.IntegerField()
+    duration_formatted = serializers.CharField()
+
+
+class PaymentInfoSerializer(serializers.Serializer):
+    """Serializer for payment information in parking history"""
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    currency = serializers.CharField(default='BDT')
+    status = serializers.CharField()
+    method = serializers.CharField(required=False, allow_null=True)
+
+
+class ParkingSessionSerializer(serializers.ModelSerializer):
+    """Detailed serializer for parking session (user history)"""
+    user = serializers.SerializerMethodField()
+    vehicle = serializers.SerializerMethodField()
+    location = serializers.SerializerMethodField()
+    timing = serializers.SerializerMethodField()
+    payment = serializers.SerializerMethodField()
+    session_status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Booking
+        fields = [
+            'id',
+            'booking_id',
+            'user',
+            'vehicle',
+            'location',
+            'timing',
+            'payment',
+            'session_status',
+            'notes'
+        ]
+    
+    def get_booking_id(self, obj):
+        return obj.id
+    
+    def get_user(self, obj):
+        return {
+            'id': obj.user.id,
+            'username': obj.user.username,
+            'email': obj.user.email
+        }
+    
+    def get_vehicle(self, obj):
+        if obj.vehicle:
+            return {
+                'type': obj.vehicle.vehicle_type,
+                'plate': obj.vehicle.number_plate,
+                'model': obj.vehicle.model or 'N/A',
+                'color': obj.vehicle.color or 'N/A'
+            }
+        return {
+            'type': 'N/A',
+            'plate': 'N/A',
+            'model': 'N/A',
+            'color': 'N/A'
+        }
+    
+    def get_location(self, obj):
+        if obj.slot:
+            return {
+                'name': obj.slot.parking_lot.name if obj.slot.parking_lot else 'Unknown',
+                'zone': obj.slot.section or 'N/A',
+                'floor': obj.slot.floor or 'N/A',
+                'slot_number': obj.slot.slot_number or 'N/A'
+            }
+        return {
+            'name': 'Unknown',
+            'zone': 'N/A',
+            'floor': 'N/A',
+            'slot_number': 'N/A'
+        }
+    
+    def get_timing(self, obj):
+        check_in_time = obj.checked_in_at or obj.start_time
+        check_out_time = obj.checked_out_at
+        
+        # Calculate duration
+        duration_minutes = 0
+        if check_in_time and check_out_time:
+            duration = check_out_time - check_in_time
+            duration_minutes = int(duration.total_seconds() / 60)
+        elif check_in_time and obj.status == 'checked_in':
+            # Currently parked
+            duration = timezone.now() - check_in_time
+            duration_minutes = int(duration.total_seconds() / 60)
+        
+        # Format duration
+        hours = duration_minutes // 60
+        minutes = duration_minutes % 60
+        if hours > 0:
+            duration_formatted = f"{hours}h {minutes}m"
+        else:
+            duration_formatted = f"{minutes}m"
+        
+        return {
+            'check_in': check_in_time,
+            'check_out': check_out_time,
+            'duration_minutes': duration_minutes,
+            'duration_formatted': duration_formatted
+        }
+    
+    def get_payment(self, obj):
+        # Determine payment status
+        payment_status = 'pending'
+        if obj.status == 'checked_out':
+            payment_status = 'paid'
+        elif obj.status == 'cancelled':
+            payment_status = 'refunded'
+        
+        return {
+            'amount': float(obj.total_price) if obj.total_price else 0.00,
+            'currency': 'BDT',
+            'status': payment_status,
+            'method': 'N/A'  # Can be extended if payment method is tracked
+        }
+    
+    def get_session_status(self, obj):
+        """Map booking status to session status"""
+        status_mapping = {
+            'pending': 'pending',
+            'confirmed': 'active',
+            'checked_in': 'active',
+            'checked_out': 'completed',
+            'cancelled': 'cancelled',
+            'expired': 'expired'
+        }
+        return status_mapping.get(obj.status, 'unknown')
+    
+    def get_notes(self, obj):
+        notes = []
+        if obj.check_in_notes:
+            notes.append(f"Check-in: {obj.check_in_notes}")
+        if obj.check_out_notes:
+            notes.append(f"Check-out: {obj.check_out_notes}")
+        return ' | '.join(notes) if notes else ''
+
+
+class ParkingSessionListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for parking session list view"""
+    vehicle_plate = serializers.SerializerMethodField()
+    vehicle_type = serializers.SerializerMethodField()
+    location_name = serializers.SerializerMethodField()
+    check_in_time = serializers.SerializerMethodField()
+    check_out_time = serializers.SerializerMethodField()
+    duration = serializers.SerializerMethodField()
+    amount = serializers.SerializerMethodField()
+    session_status = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Booking
+        fields = [
+            'id',
+            'vehicle_plate',
+            'vehicle_type',
+            'location_name',
+            'check_in_time',
+            'check_out_time',
+            'duration',
+            'amount',
+            'session_status'
+        ]
+    
+    def get_vehicle_plate(self, obj):
+        return obj.vehicle.number_plate if obj.vehicle else 'N/A'
+    
+    def get_vehicle_type(self, obj):
+        return obj.vehicle.vehicle_type if obj.vehicle else 'N/A'
+    
+    def get_location_name(self, obj):
+        if obj.slot and obj.slot.parking_lot:
+            return obj.slot.parking_lot.name
+        return 'Unknown'
+    
+    def get_check_in_time(self, obj):
+        return obj.checked_in_at or obj.start_time
+    
+    def get_check_out_time(self, obj):
+        return obj.checked_out_at
+    
+    def get_duration(self, obj):
+        check_in = obj.checked_in_at or obj.start_time
+        check_out = obj.checked_out_at
+        
+        if check_in and check_out:
+            duration = check_out - check_in
+            minutes = int(duration.total_seconds() / 60)
+            hours = minutes // 60
+            mins = minutes % 60
+            return f"{hours}h {mins}m" if hours > 0 else f"{mins}m"
+        elif check_in and obj.status == 'checked_in':
+            duration = timezone.now() - check_in
+            minutes = int(duration.total_seconds() / 60)
+            hours = minutes // 60
+            mins = minutes % 60
+            return f"{hours}h {mins}m (ongoing)" if hours > 0 else f"{mins}m (ongoing)"
+        return 'N/A'
+    
+    def get_amount(self, obj):
+        return float(obj.total_price) if obj.total_price else 0.00
+    
+    def get_session_status(self, obj):
+        status_mapping = {
+            'pending': 'pending',
+            'confirmed': 'active',
+            'checked_in': 'active',
+            'checked_out': 'completed',
+            'cancelled': 'cancelled',
+            'expired': 'expired'
+        }
+        return status_mapping.get(obj.status, 'unknown')
+
+
+class UserParkingStatsSerializer(serializers.Serializer):
+    """Serializer for user parking statistics"""
+    total_sessions = serializers.IntegerField()
+    total_time_parked = serializers.DictField()
+    total_amount_paid = serializers.DecimalField(max_digits=10, decimal_places=2)
+    favorite_location = serializers.DictField(required=False, allow_null=True)
+    most_used_vehicle = serializers.DictField(required=False, allow_null=True)
+    average_duration_minutes = serializers.IntegerField()
+    average_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    this_month = serializers.DictField()
+    active_sessions = serializers.IntegerField()
+    completed_sessions = serializers.IntegerField()
