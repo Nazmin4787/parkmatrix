@@ -53,6 +53,17 @@ from .long_stay_views import (
 # Zone Pricing Views
 from .zone_pricing_views import ZonePricingRateViewSet
 
+# Admin Check-In/Check-Out Views (Manual Workflow)
+from .admin_checkin_views import (
+    FindPreBookedSlotView,
+    AdminCheckInView,
+    AdminCheckOutView,
+    SearchBookingView
+)
+
+# Customer Check-In Views
+from .customer_checkin_views import CustomerCheckInView, CustomerCheckoutRequestView, CustomerFinalCheckoutView
+
 # Create router for zone pricing
 router = DefaultRouter()
 router.register(r'zone-pricing', ZonePricingRateViewSet, basename='zone-pricing')
@@ -83,6 +94,19 @@ urlpatterns = [
     path('bookings/<int:pk>/mark-left/', views.MarkVehicleLeftView.as_view(), name='mark-vehicle-left'),
     path('bookings/<int:pk>/receipt/', GenerateReceiptView.as_view(), name='generate-receipt'),
     path('bookings/early-checkin/', EarlyCheckInView.as_view(), name='early-checkin'),
+
+    # Admin Check-In/Check-Out (Pre-Booked Slot Verification)
+    path('admin/checkin/find/', FindPreBookedSlotView.as_view(), name='find-prebooked-slot'),
+    path('admin/checkin/', AdminCheckInView.as_view(), name='admin-checkin'),
+    path('admin/checkout/', AdminCheckOutView.as_view(), name='admin-checkout'),
+    path('admin/bookings/search/', SearchBookingView.as_view(), name='search-booking'),
+    
+    # Customer Self Check-In (After Gate Verification)
+    path('customer/checkin/', CustomerCheckInView.as_view(), name='customer-checkin'),
+    
+    # Customer Checkout Workflow
+    path('customer/checkout/request/', CustomerCheckoutRequestView.as_view(), name='customer-checkout-request'),
+    path('customer/checkout/confirm/', CustomerFinalCheckoutView.as_view(), name='customer-checkout-confirm'),
 
     # Vehicle management
     path('vehicles/', VehicleListCreateView.as_view(), name='vehicle-list-create'),

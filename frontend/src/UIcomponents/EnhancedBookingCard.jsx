@@ -24,7 +24,33 @@ export default function EnhancedBookingCard({
     try {
       setActionLoading(true);
       
-      // Show loading message
+      // NEW WORKFLOW: If booking is verified, use customer self check-in endpoint
+      if (booking.status === 'verified') {
+        showToast('Completing check-in...', 'info');
+        
+        // Call new customer check-in endpoint (no location needed)
+        const token = localStorage.getItem('accessToken');
+        const response = await fetch('http://localhost:8000/api/customer/checkin/', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ booking_id: booking.id })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to check in');
+        }
+        
+        showToast(`✅ Check-in successful! Your secret code: ${data.secret_code}`, 'success');
+        if (onStatusChange) onStatusChange();
+        return;
+      }
+      
+      // OLD WORKFLOW: Location-based check-in for confirmed bookings
       showToast('Getting your location...', 'info');
       
       // Get user's GPS location
@@ -48,7 +74,7 @@ export default function EnhancedBookingCard({
       
       // Handle API errors
       const errorData = error.response?.data;
-      let errorMessage = errorData?.error || errorData?.message || 'Failed to check in';
+      let errorMessage = errorData?.error || errorData?.message || error.message || 'Failed to check in';
       
       // If location verification failed (403)
       if (error.response?.status === 403 && errorData?.distance_meters) {
@@ -65,6 +91,42 @@ export default function EnhancedBookingCard({
     try {
       setActionLoading(true);
       
+      // NEW WORKFLOW: If booking is checkout_verified, use customer final checkout endpoint
+      if (booking.status === 'checkout_verified') {
+        showToast('Completing checkout...', 'info');
+        
+        const token = localStorage.getItem('accessToken');
+        const response = await fetch(
+          'http://localhost:8000/api/customer/checkout/confirm/',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              booking_id: booking.id
+            })
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to complete checkout');
+        }
+
+        let message = '✅ Checkout complete! Thank you for parking with us.';
+        if (result.booking?.overtime_charge && parseFloat(result.booking.overtime_charge) > 0) {
+          message += `\n\n⏱️ Overtime charge: $${result.booking.overtime_charge}`;
+        }
+
+        showToast(message, 'success');
+        if (onStatusChange) onStatusChange();
+        return;
+      }
+      
+      // OLD WORKFLOW: Direct checkout (fallback for old bookings)
       // Show loading message
       showToast('Getting your location...', 'info');
       
@@ -94,7 +156,7 @@ export default function EnhancedBookingCard({
       
       // Handle API errors
       const errorData = error.response?.data;
-      let errorMessage = errorData?.error || errorData?.message || 'Failed to check out';
+      let errorMessage = errorData?.error || errorData?.message || error.message || 'Failed to check out';
       
       // If location verification failed (403)
       if (error.response?.status === 403 && errorData?.distance_meters) {
@@ -110,31 +172,20 @@ export default function EnhancedBookingCard({
   const getStatusInfo = () => {
     const status = booking.status || (booking.is_active ? 'confirmed' : 'completed');
     
-    // For confirmed bookings, check if within check-in window
+    // For confirmed bookings - waiting for gate verification by admin
     if (status === 'confirmed') {
-      const now = new Date();
-      const startTime = new Date(booking.start_time);
-      const endTime = new Date(booking.end_time);
-      
-      // Check-in window: 30 minutes before start time to 2 hours after end time
-      const checkInWindowStart = new Date(startTime);
-      checkInWindowStart.setMinutes(checkInWindowStart.getMinutes() - 30);
-      
-      const checkInWindowEnd = new Date(endTime);
-      checkInWindowEnd.setHours(checkInWindowEnd.getHours() + 2);
-      
-      if (now < checkInWindowStart) {
-        return { text: 'Check-in Not Open Yet', class: 'status-pending', color: '#9CA3AF' };
-      } else if (now > checkInWindowEnd) {
-        return { text: 'Check-in Window Closed', class: 'status-expired', color: '#F59E0B' };
-      } else {
-        return { text: 'Ready for Check-in', class: 'status-ready', color: '#3B82F6' };
-      }
+      return { text: '🚗 Arrive at Gate for Verification', class: 'status-pending', color: '#F59E0B' };
     }
     
     switch (status) {
+      case 'verified':
+        return { text: '✅ Verified - Ready to Check In', class: 'status-verified', color: '#8B5CF6' };
       case 'checked_in':
         return { text: 'Checked In', class: 'status-checked-in', color: '#10B981' };
+      case 'checkout_requested':
+        return { text: '🚪 Checkout Requested', class: 'status-checkout-requested', color: '#F59E0B' };
+      case 'checkout_verified':
+        return { text: '✅ Checkout Verified', class: 'status-checkout-verified', color: '#8B5CF6' };
       case 'checked_out':
         return { text: 'Checked Out', class: 'status-checked-out', color: '#6B7280' };
       case 'cancelled':
@@ -149,28 +200,21 @@ export default function EnhancedBookingCard({
   const canCheckIn = () => {
     const status = booking.status || 'confirmed';
     
-    // Only allow check-in if within the time window
-    if (status === 'confirmed' && booking.is_active) {
-      const now = new Date();
-      const startTime = new Date(booking.start_time);
-      const endTime = new Date(booking.end_time);
-      
-      // Check-in window: 30 minutes before start time to 2 hours after end time
-      const checkInWindowStart = new Date(startTime);
-      checkInWindowStart.setMinutes(checkInWindowStart.getMinutes() - 30);
-      
-      const checkInWindowEnd = new Date(endTime);
-      checkInWindowEnd.setHours(checkInWindowEnd.getHours() + 2);
-      
-      return now >= checkInWindowStart && now <= checkInWindowEnd;
+    // NEW WORKFLOW: Only allow check-in for verified bookings (verified at gate by admin)
+    // Customer CANNOT check in until admin has verified at the gate
+    if (status === 'verified' && booking.is_active) {
+      return true;
     }
     
+    // Confirmed bookings must be verified at gate first
     return false;
   };
 
   const canCheckOut = () => {
     const status = booking.status;
-    return status === 'checked_in';
+    // NEW WORKFLOW: Only allow final checkout after admin verification at exit gate
+    // Customer CANNOT checkout until admin has verified at the exit gate
+    return status === 'checkout_verified';
   };
 
   const formatDateTime = (dateTimeString) => {
@@ -285,7 +329,7 @@ export default function EnhancedBookingCard({
               onClick={handleCheckIn}
               disabled={actionLoading}
             >
-              {actionLoading ? 'Checking In...' : 'Check In'}
+              {actionLoading ? 'Checking In...' : (booking.status === 'verified' ? '🎫 Check In Now' : 'Check In')}
             </button>
           )}
           
@@ -295,7 +339,7 @@ export default function EnhancedBookingCard({
               onClick={handleCheckOut}
               disabled={actionLoading}
             >
-              {actionLoading ? 'Checking Out...' : 'Check Out'}
+              {actionLoading ? 'Completing Checkout...' : '✅ Confirm Checkout'}
             </button>
           )}
           

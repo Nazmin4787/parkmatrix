@@ -22,9 +22,9 @@ export default function EnhancedBookingHistory() {
 
   // Enhanced booking status filters
   const statusFilters = {
-    active: ['confirmed', 'checked_in'],
+    active: ['confirmed', 'verified', 'checked_in', 'checkout_requested', 'checkout_verified'],
     completed: ['checked_out', 'cancelled', 'expired'],
-    checkedIn: ['checked_in'],
+    checkedIn: ['checked_in', 'checkout_requested', 'checkout_verified'],
     all: []
   };
 

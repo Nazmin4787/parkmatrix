@@ -27,6 +27,9 @@ import CheckInCheckOutLogs from './pages/administration/CheckInCheckOutLogs';
 import AdminUserHistory from './pages/administration/AdminUserHistory';
 import SlotStatusTracker from './pages/administration/SlotStatusTracker';
 import LongStayMonitor from './pages/admin/LongStayMonitor';
+import CheckIn from './pages/administration/CheckIn';
+import CheckOut from './pages/administration/CheckOut';
+import MyParking from './pages/customer/MyParking';
 import { getCurrentUser } from './store/userstore';
 import Navbar from './UIcomponents/Navbar';
 import ParkingMap from './pages/ParkingMap';
@@ -58,6 +61,7 @@ export default function MainApp() {
         <Route path="/bookings" element={<Guard roles={['customer']}><EnhancedBookingHistory /></Guard>} />
         <Route path="/bookings-legacy" element={<Guard roles={['customer']}><BookingHistory /></Guard>} />
         <Route path="/simple-bookings" element={<Guard roles={['customer']}><SimpleBookingsList /></Guard>} />
+        <Route path="/my-parking" element={<Guard roles={['customer']}><MyParking /></Guard>} />
         <Route path="/bookings-debug" element={<BookingHistoryDebug />} />
         <Route path="/phase8-test" element={<Phase8TestPage />} />
         <Route path="/user-debug" element={<UserDebug />} />
@@ -76,6 +80,10 @@ export default function MainApp() {
         <Route path="/admin/user-history" element={<Guard roles={['admin']}><AdminUserHistory /></Guard>} />
         <Route path="/admin/slot-tracker" element={<Guard roles={['admin']}><SlotStatusTracker /></Guard>} />
         <Route path="/admin/long-stay" element={<Guard roles={['admin', 'security']}><LongStayMonitor /></Guard>} />
+        
+        {/* Check-In/Check-Out Forms */}
+        <Route path="/admin/checkin" element={<Guard roles={['admin', 'security']}><CheckIn /></Guard>} />
+        <Route path="/admin/checkout" element={<Guard roles={['admin', 'security']}><CheckOut /></Guard>} />
 
         <Route path="/nearest-parking" element={<NearestParking />} />
         <Route path="/parking-map" element={<ParkingMap />} />

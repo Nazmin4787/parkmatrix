@@ -1,0 +1,314 @@
+.my-parking-page {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.2rem;
+  color: #6c757d;
+}
+
+/* No Booking State */
+.no-booking {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.no-booking-icon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.no-booking h2 {
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.no-booking p {
+  color: #6c757d;
+}
+
+/* Container */
+.my-parking-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* Page Header */
+.page-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.status-badge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.status-confirmed {
+  background: rgba(255, 193, 7, 0.3);
+}
+
+.status-checked_in {
+  background: rgba(40, 167, 69, 0.3);
+}
+
+/* Secret Code Section */
+.secret-code-section {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  padding: 2rem;
+  margin: 2rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.secret-code-header h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+}
+
+.secret-code-header p {
+  margin: 0;
+  opacity: 0.9;
+}
+
+.secret-code-display {
+  background: white;
+  color: #333;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.code-value {
+  font-size: 3.5rem;
+  font-weight: bold;
+  letter-spacing: 1rem;
+  font-family: 'Courier New', monospace;
+  color: #f5576c;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.copy-btn {
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.copy-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.code-warning {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+/* Booking Info Card */
+.booking-info-card {
+  padding: 2rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.booking-info-card h3 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+  font-size: 1.3rem;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.info-label {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-value {
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.info-value.price {
+  color: #28a745;
+  font-size: 1.3rem;
+}
+
+/* Instructions Card */
+.instructions-card {
+  padding: 2rem;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  margin: 2rem;
+  border-radius: 8px;
+}
+
+.instructions-card h4 {
+  margin: 0 0 1rem 0;
+  color: #856404;
+  font-size: 1.1rem;
+}
+
+.instructions-card ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #856404;
+}
+
+.instructions-card li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.instructions-card strong {
+  color: #f5576c;
+  font-size: 1.1rem;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .my-parking-page {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .secret-code-section {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+
+  .code-value {
+    font-size: 2rem;
+    letter-spacing: 0.5rem;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .instructions-card {
+    margin: 1rem;
+  }
+}
+
+/* Check-In Prompt for Verified Bookings */
+.checkin-prompt {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2rem;
+  margin: 0 0 2rem 0;
+  border-radius: 0;
+  text-align: center;
+}
+
+.checkin-prompt-header h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+}
+
+.checkin-prompt-header p {
+  margin: 0 0 1.5rem 0;
+  opacity: 0.9;
+}
+
+.btn-checkin-now {
+  background: white;
+  color: #667eea;
+  border: none;
+  padding: 1rem 3rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-checkin-now:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn-checkin-now:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.checkin-prompt .alert {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+.checkin-prompt .alert-error {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.checkin-prompt .alert-success {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}

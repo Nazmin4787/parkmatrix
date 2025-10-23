@@ -85,6 +85,23 @@ export default function AdminDashboard() {
       <div className="dashboard-section">
         <h3 className="section-title">⚡ Quick Actions</h3>
         <div className="admin-actions-grid">
+          {/* Check-In/Check-Out Actions */}
+          <Link className="action-card action-success" to="/admin/checkin">
+            <div className="action-icon">✅</div>
+            <div className="action-content">
+              <div className="action-title">Check-In Vehicle</div>
+              <div className="action-desc">Manual vehicle check-in</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-danger" to="/admin/checkout">
+            <div className="action-icon">🚪</div>
+            <div className="action-content">
+              <div className="action-title">Check-Out Vehicle</div>
+              <div className="action-desc">Complete parking session</div>
+            </div>
+          </Link>
+
           <Link className="action-card action-primary" to="/admin/slots">
             <div className="action-icon">🎯</div>
             <div className="action-content">

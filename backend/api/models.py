@@ -138,7 +138,10 @@ class Booking(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
+        ('verified', 'Verified'),  # Admin verified at gate entrance
         ('checked_in', 'Checked In'),
+        ('checkout_requested', 'Checkout Requested'),  # Customer requested checkout
+        ('checkout_verified', 'Checkout Verified'),  # Admin verified at gate exit
         ('checked_out', 'Checked Out'),
         ('cancelled', 'Cancelled'),
         ('expired', 'Expired'),
@@ -156,18 +159,35 @@ class Booking(models.Model):
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='confirmed')
 
+    # Secret code for check-in/check-out verification
+    secret_code = models.CharField(max_length=6, null=True, blank=True, unique=True, db_index=True, 
+                                   help_text="6-digit code given to user at check-in for check-out verification")
+
     # Fields for handling extensions
     initial_end_time = models.DateTimeField(null=True, blank=True)
     extension_count = models.PositiveIntegerField(default=0)
     extension_history = models.JSONField(default=list, blank=True)
     
-    # Check-in fields
+    # Gate verification fields (by admin/security at entrance)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_bookings')
+    verification_notes = models.TextField(blank=True, null=True)
+    
+    # Check-in fields (by customer after entering)
     checked_in_at = models.DateTimeField(null=True, blank=True)
     checked_in_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_in_bookings')
     checked_in_ip = models.GenericIPAddressField(null=True, blank=True)
     check_in_notes = models.TextField(blank=True, null=True)
     
-    # Check-out fields
+    # Checkout request fields (by customer initiating checkout)
+    checkout_requested_at = models.DateTimeField(null=True, blank=True)
+    
+    # Checkout verification fields (by admin/security at exit gate)
+    checkout_verified_at = models.DateTimeField(null=True, blank=True)
+    checkout_verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='checkout_verified_bookings')
+    checkout_verification_notes = models.TextField(blank=True, null=True)
+    
+    # Check-out fields (final checkout by customer)
     checked_out_at = models.DateTimeField(null=True, blank=True)
     checked_out_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='checked_out_bookings')
     checked_out_ip = models.GenericIPAddressField(null=True, blank=True)
@@ -182,6 +202,38 @@ class Booking(models.Model):
         if not self.initial_end_time:
             self.initial_end_time = self.end_time
         super().save(*args, **kwargs)
+    
+    @staticmethod
+    def generate_secret_code():
+        """
+        Generate a unique 6-digit alphanumeric secret code.
+        Returns: str - 6-digit code
+        """
+        import random
+        import string
+        
+        max_attempts = 50
+        for _ in range(max_attempts):
+            # Generate random 6-digit code (numbers only for simplicity)
+            code = ''.join(random.choices(string.digits, k=6))
+            
+            # Check if code already exists
+            if not Booking.objects.filter(secret_code=code).exists():
+                return code
+        
+        # Fallback: add letters if too many collisions
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        return code
+    
+    def assign_secret_code(self):
+        """
+        Assign a unique secret code to this booking if it doesn't have one.
+        Returns: str - The assigned secret code
+        """
+        if not self.secret_code:
+            self.secret_code = self.generate_secret_code()
+            self.save()
+        return self.secret_code
     
     def can_check_in(self, user):
         """
