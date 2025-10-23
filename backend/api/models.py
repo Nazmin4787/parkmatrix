@@ -44,6 +44,13 @@ class ParkingSlot(models.Model):
         ('any', 'Any Vehicle'),  # For flexible slots
     ]
     
+    PARKING_ZONE_CHOICES = [
+        ('COLLEGE_PARKING_CENTER', 'College Parking'),
+        ('HOME_PARKING_CENTER', 'Home Parking'),
+        ('METRO_PARKING_CENTER', 'Metro Parking'),
+        ('VIVIVANA_PARKING_CENTER', 'Vivivana Parking'),
+    ]
+    
     parking_lot = models.ForeignKey(ParkingLot, on_delete=models.CASCADE, related_name='slots', null=True)
     slot_number = models.CharField(max_length=20)
     floor = models.CharField(max_length=5)
@@ -64,9 +71,18 @@ class ParkingSlot(models.Model):
         default='any',
         help_text="Type of vehicle this slot is designated for"
     )
+    
+    # New field for parking zone
+    parking_zone = models.CharField(
+        max_length=30,
+        choices=PARKING_ZONE_CHOICES,
+        default='COLLEGE_PARKING_CENTER',
+        help_text="Parking zone/location this slot belongs to"
+    )
 
     def __str__(self):
-        return f"Slot {self.slot_number} ({self.vehicle_type}) - Floor {self.floor}, Section {self.section}"
+        zone_display = dict(self.PARKING_ZONE_CHOICES).get(self.parking_zone, self.parking_zone)
+        return f"Slot {self.slot_number} ({self.vehicle_type}) - {zone_display} - Floor {self.floor}, Section {self.section}"
     
     def is_compatible_with_vehicle(self, vehicle_type):
         """Check if this slot can accommodate the given vehicle type"""
@@ -298,31 +314,207 @@ class AuditLog(models.Model):
 
 
 class PricingRate(models.Model):
-    rate_name = models.CharField(max_length=100, unique=True)
-    hourly_rate = models.DecimalField(max_digits=6, decimal_places=2)
-    daily_rate = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    extension_rate_multiplier = models.DecimalField(max_digits=4, decimal_places=2, default=1.0)
-    is_default = models.BooleanField(default=False)
+    """
+    Model to define parking rates based on vehicle type and time periods.
+    Supports hourly, daily, weekend, holiday, and special time slot rates.
+    """
+    rate_name = models.CharField(max_length=100, unique=True, help_text="Name of the rate plan")
+    description = models.TextField(blank=True, help_text="Description of the rate plan")
     
+    # Vehicle type choices - updated to match requirements
     VEHICLE_TYPE_CHOICES = [
-        ('all', 'All'),
-        ('car', 'Car'),
+        ('all', 'All Vehicles'),
+        ('2-wheeler', '2-Wheeler (Bike/Scooter)'),
+        ('4-wheeler', '4-Wheeler (Car/Sedan)'),
         ('suv', 'SUV'),
+        ('electric', 'Electric Vehicle'),
+        ('heavy', 'Heavy Vehicle (Truck/Bus)'),
+        # Keep legacy options for backward compatibility
+        ('car', 'Car'),
         ('bike', 'Bike'),
     ]
-    vehicle_type = models.CharField(max_length=10, choices=VEHICLE_TYPE_CHOICES, default='all')
+    vehicle_type = models.CharField(
+        max_length=15, 
+        choices=VEHICLE_TYPE_CHOICES, 
+        default='all',
+        help_text="Type of vehicle this rate applies to"
+    )
     
-    effective_from = models.DateTimeField(null=True, blank=True)
-    effective_to = models.DateTimeField(null=True, blank=True)
+    # Base rates
+    hourly_rate = models.DecimalField(
+        max_digits=6, 
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Rate per hour in ₹"
+    )
+    daily_rate = models.DecimalField(
+        max_digits=8, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Flat rate for full day (24 hours) in ₹"
+    )
+    
+    # Special rates
+    weekend_rate = models.DecimalField(
+        max_digits=6, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Special hourly rate for weekends (Sat/Sun) in ₹"
+    )
+    holiday_rate = models.DecimalField(
+        max_digits=6, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Special hourly rate for public holidays in ₹"
+    )
+    
+    # Time slot based rates
+    time_slot_start = models.TimeField(
+        null=True, 
+        blank=True,
+        help_text="Start time for special rate (e.g., 18:00 for evening)"
+    )
+    time_slot_end = models.TimeField(
+        null=True, 
+        blank=True,
+        help_text="End time for special rate (e.g., 06:00 for morning)"
+    )
+    special_rate = models.DecimalField(
+        max_digits=6, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text="Special hourly rate for specific time slot in ₹"
+    )
+    
+    # Extension and multipliers
+    extension_rate_multiplier = models.DecimalField(
+        max_digits=4, 
+        decimal_places=2, 
+        default=1.0,
+        help_text="Multiplier for overtime/extension charges"
+    )
+    
+    # Status and control
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this rate is currently active"
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text="Whether this is the default rate for the vehicle type"
+    )
+    
+    # Validity period
+    effective_from = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Date/time when this rate becomes effective"
+    )
+    effective_to = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text="Date/time when this rate expires"
+    )
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_default', 'vehicle_type', 'rate_name']
+        verbose_name = "Pricing Rate"
+        verbose_name_plural = "Pricing Rates"
 
     def __str__(self):
-        return f"{self.rate_name} (${self.hourly_rate}/hr)"
+        vehicle_display = self.get_vehicle_type_display()
+        return f"{self.rate_name} - {vehicle_display} (₹{self.hourly_rate}/hr)"
 
     def save(self, *args, **kwargs):
+        # Ensure only one default rate exists per vehicle type
         if self.is_default:
-            # Ensure only one default rate exists
-            PricingRate.objects.filter(is_default=True).update(is_default=False)
+            PricingRate.objects.filter(
+                is_default=True, 
+                vehicle_type=self.vehicle_type
+            ).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
+    
+    def get_applicable_rate(self, booking_datetime=None):
+        """
+        Get the applicable hourly rate based on date/time.
+        Returns the appropriate rate (regular, weekend, holiday, or time slot).
+        """
+        from django.utils import timezone
+        
+        if booking_datetime is None:
+            booking_datetime = timezone.now()
+        
+        # Check if it's a weekend (Saturday=5, Sunday=6)
+        if booking_datetime.weekday() in [5, 6] and self.weekend_rate:
+            return self.weekend_rate
+        
+        # Check if it's within special time slot
+        if self.time_slot_start and self.time_slot_end and self.special_rate:
+            booking_time = booking_datetime.time()
+            # Handle time slots that cross midnight
+            if self.time_slot_start <= self.time_slot_end:
+                if self.time_slot_start <= booking_time <= self.time_slot_end:
+                    return self.special_rate
+            else:
+                if booking_time >= self.time_slot_start or booking_time <= self.time_slot_end:
+                    return self.special_rate
+        
+        # Default to regular hourly rate
+        return self.hourly_rate
+    
+    def calculate_fee(self, hours=0, days=0, booking_datetime=None):
+        """
+        Calculate parking fee based on duration.
+        Args:
+            hours: Number of hours
+            days: Number of days
+            booking_datetime: DateTime for rate calculation (weekends, holidays, etc.)
+        Returns:
+            Decimal: Total fee in ₹
+        """
+        from decimal import Decimal
+        from django.utils import timezone
+        
+        if booking_datetime is None:
+            booking_datetime = timezone.now()
+        
+        total_fee = Decimal('0.00')
+        
+        # Calculate daily rate if applicable
+        if days > 0 and self.daily_rate:
+            total_fee += self.daily_rate * Decimal(str(days))
+        
+        # Calculate hourly rate
+        if hours > 0:
+            applicable_rate = self.get_applicable_rate(booking_datetime)
+            total_fee += applicable_rate * Decimal(str(hours))
+        
+        return total_fee
+    
+    def is_valid_now(self):
+        """Check if this rate is currently valid based on effective dates."""
+        from django.utils import timezone
+        now = timezone.now()
+        
+        if not self.is_active:
+            return False
+        
+        if self.effective_from and now < self.effective_from:
+            return False
+        
+        if self.effective_to and now > self.effective_to:
+            return False
+        
+        return True
         
         
 class DynamicPricingRule(models.Model):
@@ -478,3 +670,106 @@ class AccessLog(models.Model):
     def is_active_session(self):
         """Check if session is still active (no logout timestamp)"""
         return self.logout_timestamp is None and self.status == 'success'
+
+
+class ZonePricingRate(models.Model):
+    """Pricing rates specific to parking zones"""
+    PARKING_ZONE_CHOICES = [
+        ('COLLEGE_PARKING_CENTER', 'College Parking Center'),
+        ('HOME_PARKING_CENTER', 'Home Parking Center'),
+        ('METRO_PARKING_CENTER', 'Metro Parking Center'),
+        ('VIVIVANA_PARKING_CENTER', 'Vivivana Parking Center'),
+    ]
+    
+    VEHICLE_TYPE_CHOICES = [
+        ('car', 'Car'),
+        ('bike', 'Bike'),
+        ('suv', 'SUV'),
+        ('truck', 'Truck'),
+        ('any', 'Any Vehicle'),
+    ]
+    
+    parking_zone = models.CharField(
+        max_length=50,
+        choices=PARKING_ZONE_CHOICES,
+        help_text="Parking zone for this rate"
+    )
+    vehicle_type = models.CharField(
+        max_length=20,
+        choices=VEHICLE_TYPE_CHOICES,
+        help_text="Vehicle type for this rate"
+    )
+    rate_name = models.CharField(
+        max_length=100,
+        help_text="Display name for this rate"
+    )
+    description = models.TextField(blank=True, null=True)
+    
+    # Pricing
+    hourly_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Hourly parking rate"
+    )
+    daily_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Daily parking rate (24 hours)"
+    )
+    weekend_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Weekend hourly rate (optional, defaults to hourly_rate)"
+    )
+    
+    # Status and validity
+    is_active = models.BooleanField(default=True)
+    effective_from = models.DateTimeField(
+        default=timezone.now,
+        help_text="When this rate becomes effective"
+    )
+    effective_to = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this rate expires (optional)"
+    )
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_zone_rates'
+    )
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['parking_zone', 'vehicle_type', 'is_active']]
+        indexes = [
+            models.Index(fields=['parking_zone', 'vehicle_type']),
+            models.Index(fields=['is_active', 'effective_from']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_parking_zone_display()} - {self.get_vehicle_type_display()}: ₹{self.hourly_rate}/hr"
+    
+    def get_effective_rate(self, is_weekend=False):
+        """Get the effective rate based on day type"""
+        if is_weekend and self.weekend_rate:
+            return self.weekend_rate
+        return self.hourly_rate
+    
+    def is_valid_now(self):
+        """Check if rate is currently valid"""
+        now = timezone.now()
+        if not self.is_active:
+            return False
+        if self.effective_from > now:
+            return False
+        if self.effective_to and self.effective_to < now:
+            return False
+        return True

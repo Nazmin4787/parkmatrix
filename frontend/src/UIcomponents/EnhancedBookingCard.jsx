@@ -211,6 +211,13 @@ export default function EnhancedBookingCard({
           </div>
           
           <div className="detail-item">
+            <span className="detail-label">Parking Location</span>
+            <span className="detail-value">
+              {booking.slot?.parking_zone_display || booking.parking_zone_display || 'N/A'}
+            </span>
+          </div>
+          
+          <div className="detail-item">
             <span className="detail-label">Vehicle</span>
             <span className="detail-value">
               {booking.vehicle?.number_plate || 'N/A'}

@@ -379,6 +379,7 @@ export default function CheckInCheckOutLogs() {
                   <tr>
                     <th>Vehicle</th>
                     <th>User ID</th>
+                    <th>Parking Zone</th>
                     <th>Check-In Time</th>
                     <th>Check-Out Time</th>
                     <th>Status</th>
@@ -397,6 +398,7 @@ export default function CheckInCheckOutLogs() {
                       >
                         <td className="vehicle-plate">{log.vehicle_plate || 'N/A'}</td>
                         <td>{log.user_username || `user${log.user_id}` || 'N/A'}</td>
+                        <td>{log.parking_zone || 'Unknown'}</td>
                         <td>{formatTimeOnly(log.checkin_time || log.timestamp)}</td>
                         <td>{isCheckedOut ? formatTimeOnly(log.checkout_time || log.timestamp) : '—'}</td>
                         <td>
@@ -541,8 +543,8 @@ export default function CheckInCheckOutLogs() {
                   </div>
 
                   <div className="vehicle-detail">
-                    <span className="detail-label">Parking Lot:</span>
-                    <span className="detail-value">{vehicle.slot_info?.parking_lot || 'N/A'}</span>
+                    <span className="detail-label">Parking Zone:</span>
+                    <span className="detail-value">{vehicle.slot_info?.parking_zone || 'Unknown'}</span>
                   </div>
 
                   <div className="vehicle-detail">

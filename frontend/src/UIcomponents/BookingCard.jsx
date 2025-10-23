@@ -13,6 +13,10 @@ export default function BookingCard({ booking, onViewTicket, onCancel }) {
         </div>
         
         <div>
+          <strong>Parking Location:</strong> {booking.slot?.parking_zone_display || booking.parking_zone_display || 'N/A'}
+        </div>
+        
+        <div>
           <strong>Start:</strong> {new Date(booking.start_time).toLocaleString()}
         </div>
         

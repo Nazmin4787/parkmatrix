@@ -7,6 +7,7 @@ import {
   adminGetSlotStatistics,
   adminBulkUpdateSlots 
 } from '../../services/parkingSlot';
+import { getParkingZones, getSlotsByZone } from '../../services/parkingZone';
 import VehicleTypeSelector from '../../UIcomponents/VehicleTypeSelector';
 import Modal from '../../UIcomponents/Modal';
 import Toast from '../../UIcomponents/Toast';
@@ -20,12 +21,18 @@ export default function ManageSlots() {
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [bulkUpdateType, setBulkUpdateType] = useState('car');
   
+  // Zone management state
+  const [parkingZones, setParkingZones] = useState([]);
+  const [selectedZone, setSelectedZone] = useState('ALL');
+  const [zoneStats, setZoneStats] = useState(null);
+  
   // Form state for new slot creation
   const [newSlot, setNewSlot] = useState({
     slot_number: '',
     floor: '1',
     section: 'A',
     vehicle_type: 'car',
+    parking_zone: 'COLLEGE_PARKING_CENTER',
     pos_x: 0,
     pos_y: 0,
     height_cm: 200,
@@ -37,9 +44,52 @@ export default function ManageSlots() {
   const [message, setMessage] = useState('');
   const [open, setOpen] = useState(false);
 
+  // Load parking zones on component mount
+  useEffect(() => {
+    loadParkingZones();
+  }, []);
+
+  async function loadParkingZones() {
+    try {
+      const data = await getParkingZones();
+      setParkingZones(data.zones || []);
+    } catch (error) {
+      console.error('Error loading parking zones:', error);
+    }
+  }
+
   async function load() {
     try {
-      const data = await adminListSlots(filterVehicleType);
+      let data;
+      
+      // If a specific zone is selected, load slots for that zone
+      if (selectedZone && selectedZone !== 'ALL') {
+        // Use admin API with zone filter
+        data = await adminListSlots(filterVehicleType, null, selectedZone);
+        
+        // Get zone data for stats
+        try {
+          const zoneData = await getSlotsByZone(selectedZone);
+          setZoneStats({
+            zone_name: zoneData.zone_name,
+            total_slots: zoneData.total_slots,
+            available_slots: zoneData.available_slots
+          });
+        } catch (error) {
+          console.error('Error loading zone stats:', error);
+          // Calculate stats from data
+          setZoneStats({
+            zone_name: selectedZone,
+            total_slots: data.length,
+            available_slots: data.filter(s => !s.is_occupied).length
+          });
+        }
+      } else {
+        // Load all slots
+        data = await adminListSlots(filterVehicleType);
+        setZoneStats(null);
+      }
+      
       setSlots(data);
       
       // Load statistics
@@ -51,18 +101,32 @@ export default function ManageSlots() {
     }
   }
 
-  useEffect(() => { load(); }, [filterVehicleType]);
+  useEffect(() => { load(); }, [filterVehicleType, selectedZone]);
 
   async function addSlot(e) {
     e.preventDefault();
     setMessage('');
+    
+    console.log('Creating slot with data:', newSlot);
+    
     try {
-      await adminCreateSlot(newSlot);
+      const createdSlot = await adminCreateSlot(newSlot);
+      console.log('Slot created:', createdSlot);
+      
+      // Get zone display name
+      const zoneDisplay = {
+        'COLLEGE_PARKING_CENTER': 'College Parking',
+        'HOME_PARKING_CENTER': 'Home Parking',
+        'METRO_PARKING_CENTER': 'Metro Parking',
+        'VIVIVANA_PARKING_CENTER': 'Vivivana Parking'
+      }[newSlot.parking_zone] || newSlot.parking_zone;
+      
       setNewSlot({
         slot_number: '',
         floor: '1',
         section: 'A',
         vehicle_type: 'car',
+        parking_zone: selectedZone !== 'ALL' ? selectedZone : 'COLLEGE_PARKING_CENTER',
         pos_x: 0,
         pos_y: 0,
         height_cm: 200,
@@ -70,11 +134,15 @@ export default function ManageSlots() {
         length_cm: 500,
         parking_lot: null
       });
-      await load();
-      setMessage('Slot created successfully');
+      
+      // Reload both zones and slots
+      await Promise.all([loadParkingZones(), load()]);
+      
+      setMessage(`✅ Slot ${newSlot.slot_number} created successfully in ${zoneDisplay}`);
     } catch (error) {
       console.error('Create slot error:', error);
-      setMessage('Failed to create slot');
+      console.error('Error response:', error.response?.data);
+      setMessage('❌ Failed to create slot: ' + (error.response?.data?.detail || error.message));
     }
   }
 
@@ -82,11 +150,11 @@ export default function ManageSlots() {
     setMessage('');
     try {
       await adminDeleteSlot(id);
-      await load();
-      setMessage('Slot deleted successfully');
+      await Promise.all([loadParkingZones(), load()]);
+      setMessage('✅ Slot deleted successfully');
     } catch (error) {
       console.error('Delete slot error:', error);
-      setMessage('Failed to delete slot');
+      setMessage('❌ Failed to delete slot');
     }
   }
 
@@ -100,11 +168,11 @@ export default function ManageSlots() {
     try {
       await adminBulkUpdateSlots(selectedSlots, bulkUpdateType);
       setSelectedSlots([]);
-      await load();
-      setMessage(`Updated ${selectedSlots.length} slots to ${bulkUpdateType} type`);
+      await Promise.all([loadParkingZones(), load()]);
+      setMessage(`✅ Updated ${selectedSlots.length} slots to ${bulkUpdateType} type`);
     } catch (error) {
       console.error('Bulk update error:', error);
-      setMessage('Failed to update slots');
+      setMessage('❌ Failed to update slots');
     }
   }
 
@@ -128,24 +196,97 @@ export default function ManageSlots() {
     setNewSlot(prev => ({ ...prev, [field]: value }));
   };
 
+  const openAddSlotModal = () => {
+    // Set the zone to current selected zone when opening modal
+    const zoneToSet = selectedZone !== 'ALL' ? selectedZone : 'COLLEGE_PARKING_CENTER';
+    console.log('Opening Add Slot modal. Selected zone:', selectedZone, '→ Setting zone to:', zoneToSet);
+    
+    setNewSlot(prev => ({
+      ...prev,
+      parking_zone: zoneToSet
+    }));
+    setOpen(true);
+  };
+
   return (
     <div>
       <h2>Manage Slots</h2>
+
+      {/* Zone Statistics Cards */}
+      {parkingZones.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '600' }}>Parking Zones Overview</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+            {parkingZones.map(zone => (
+              <div 
+                key={zone.code}
+                className={`stat-card ${selectedZone === zone.code ? 'active' : ''}`}
+                onClick={() => setSelectedZone(zone.code)}
+                style={{ 
+                  cursor: 'pointer',
+                  border: selectedZone === zone.code ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                  backgroundColor: selectedZone === zone.code ? '#eff6ff' : '#fff',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>{zone.name}</h4>
+                  <span style={{ 
+                    fontSize: '11px', 
+                    padding: '2px 6px', 
+                    borderRadius: '4px',
+                    backgroundColor: zone.occupancy_rate > 80 ? '#fee2e2' : zone.occupancy_rate > 50 ? '#fef3c7' : '#dcfce7',
+                    color: zone.occupancy_rate > 80 ? '#991b1b' : zone.occupancy_rate > 50 ? '#92400e' : '#166534'
+                  }}>
+                    {zone.occupancy_rate.toFixed(0)}%
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  <div>Total: <strong>{zone.total_slots}</strong></div>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                    <span style={{ color: '#16a34a' }}>✓ {zone.available_slots}</span>
+                    <span style={{ color: '#dc2626' }}>✗ {zone.occupied_slots}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div 
+              className={`stat-card ${selectedZone === 'ALL' ? 'active' : ''}`}
+              onClick={() => setSelectedZone('ALL')}
+              style={{ 
+                cursor: 'pointer',
+                border: selectedZone === 'ALL' ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                backgroundColor: selectedZone === 'ALL' ? '#eff6ff' : '#fff',
+                transition: 'all 0.2s'
+              }}
+            >
+              <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>All Zones</h4>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                <div>View all parking slots</div>
+                <div style={{ marginTop: '4px', color: '#3b82f6', fontWeight: '500' }}>
+                  {parkingZones.reduce((sum, z) => sum + z.total_slots, 0)} total slots
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Dashboard */}
       {statistics && (
         <div className="stats-dashboard" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
           <div className="stat-card">
             <h3>Total Slots</h3>
-            <p className="stat-number">{statistics.total_slots || slots.length}</p>
+            <p className="stat-number">{zoneStats ? zoneStats.total_slots : (statistics.total_slots || slots.length)}</p>
+            {zoneStats && <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>in {zoneStats.zone_name}</p>}
           </div>
           <div className="stat-card">
             <h3>Available</h3>
-            <p className="stat-number">{statistics.available_slots || slots.filter(s => !s.is_occupied).length}</p>
+            <p className="stat-number">{zoneStats ? zoneStats.available_slots : (statistics.available_slots || slots.filter(s => !s.is_occupied).length)}</p>
           </div>
           <div className="stat-card">
             <h3>Occupied</h3>
-            <p className="stat-number">{statistics.occupied_slots || slots.filter(s => s.is_occupied).length}</p>
+            <p className="stat-number">{zoneStats ? (zoneStats.total_slots - zoneStats.available_slots) : (statistics.occupied_slots || slots.filter(s => s.is_occupied).length)}</p>
           </div>
           <div className="stat-card">
             <h3>Selected</h3>
@@ -165,7 +306,7 @@ export default function ManageSlots() {
       </div>
 
       <div className="row" style={{ marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn-primary small" onClick={() => setOpen(true)}>Add Slot</button>
+        <button className="btn-primary small" onClick={openAddSlotModal}>Add Slot</button>
         <button className="btn-outline" onClick={load}>Refresh</button>
         
         {/* Bulk Actions */}
@@ -225,6 +366,18 @@ export default function ManageSlots() {
                 <div>
                   <strong>{s.slot_number}</strong> (Floor {s.floor}, Section {s.section})
                   {s.is_occupied && <span style={{ color: '#dc2626', marginLeft: '8px' }}>— Occupied</span>}
+                  {s.parking_zone_display && (
+                    <span style={{ 
+                      marginLeft: '8px', 
+                      fontSize: '11px', 
+                      padding: '2px 8px', 
+                      borderRadius: '12px',
+                      backgroundColor: '#f3f4f6',
+                      color: '#4b5563'
+                    }}>
+                      📍 {s.parking_zone_display}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                   <span className={`vehicle-type-badge ${s.vehicle_type}`}>
@@ -254,9 +407,16 @@ export default function ManageSlots() {
 
       {slots.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-          <p>No slots found</p>
+          <p>No slots found{selectedZone !== 'ALL' && zoneStats ? ` in ${zoneStats.zone_name}` : ''}</p>
           {filterVehicleType && (
             <p>Try changing the vehicle type filter or <button className="btn-link" onClick={() => setFilterVehicleType(null)}>show all slots</button></p>
+          )}
+          {selectedZone !== 'ALL' && (
+            <p>
+              <button className="btn-link" onClick={() => setSelectedZone('ALL')}>View all zones</button>
+              {' or '}
+              <button className="btn-primary small" onClick={openAddSlotModal}>Add a slot to this zone</button>
+            </p>
           )}
         </div>
       )}
@@ -269,6 +429,21 @@ export default function ManageSlots() {
         </>
       )}>
         <form onSubmit={addSlot} style={{ display: 'grid', gap: '16px' }}>
+          {/* Parking Zone Selection */}
+          <label>Parking Zone
+            <select 
+              value={newSlot.parking_zone} 
+              onChange={e => handleNewSlotChange('parking_zone', e.target.value)}
+              required
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            >
+              <option value="COLLEGE_PARKING_CENTER">🏫 College Parking</option>
+              <option value="HOME_PARKING_CENTER">🏠 Home Parking</option>
+              <option value="METRO_PARKING_CENTER">🚇 Metro Parking</option>
+              <option value="VIVIVANA_PARKING_CENTER">🏢 Vivivana Parking</option>
+            </select>
+          </label>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <label>Slot Number
               <input 

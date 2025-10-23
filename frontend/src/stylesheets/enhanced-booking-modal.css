@@ -125,6 +125,12 @@
   color: #4CAF50;
 }
 
+.summary-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #ddd, transparent);
+  margin: 12px 0;
+}
+
 .booking-actions {
   display: flex;
   gap: 10px;

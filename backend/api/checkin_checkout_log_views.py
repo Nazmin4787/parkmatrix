@@ -25,6 +25,7 @@ class CheckInCheckOutLogListView(generics.ListAPIView):
     """
     List all check-in/check-out logs with filtering
     Admin and Security only
+    Returns booking-based data (one row per booking session)
     """
     serializer_class = AuditLogListSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -36,12 +37,10 @@ class CheckInCheckOutLogListView(generics.ListAPIView):
         if user.role not in ['admin', 'security']:
             return AuditLog.objects.none()
         
-        # Base queryset - only check-in/out actions
+        # Base queryset - only successful check-in events (one per booking)
+        # This avoids duplicates by showing only the check-in log entry
         queryset = AuditLog.objects.filter(
-            action__in=[
-                'check_in_attempt', 'check_in_success', 'check_in_failed',
-                'check_out_attempt', 'check_out_success', 'check_out_failed'
-            ]
+            action='check_in_success'
         ).select_related(
             'booking', 
             'user', 
@@ -81,15 +80,15 @@ class CheckInCheckOutLogListView(generics.ListAPIView):
         if vehicle_type:
             queryset = queryset.filter(booking__vehicle__vehicle_type=vehicle_type)
         
-        # Filter by action type
+        # Filter by action type (check_in/check_out status)
         action_type = self.request.query_params.get('action')
         if action_type:
-            if action_type == 'check_in':
-                queryset = queryset.filter(action__icontains='check_in')
-            elif action_type == 'check_out':
-                queryset = queryset.filter(action__icontains='check_out')
-            else:
-                queryset = queryset.filter(action=action_type)
+            if action_type == 'check_out' or action_type == 'check_out_success':
+                # Only show bookings that have been checked out
+                queryset = queryset.filter(booking__status='checked_out')
+            elif action_type == 'check_in' or action_type == 'check_in_success':
+                # Only show bookings that are still checked in
+                queryset = queryset.filter(booking__status='checked_in')
         
         # Filter by success/failure status
         status_filter = self.request.query_params.get('status')

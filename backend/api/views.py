@@ -653,6 +653,11 @@ class AvailableParkingSlotsView(generics.ListAPIView):
     def get_queryset(self):
         queryset = ParkingSlot.objects.filter(is_occupied=False)
         
+        # Filter by parking zone if specified
+        parking_zone = self.request.query_params.get('parking_zone', None)
+        if parking_zone:
+            queryset = queryset.filter(parking_zone=parking_zone)
+        
         # Filter by vehicle type if specified
         vehicle_type = self.request.query_params.get('vehicle_type', None)
         if vehicle_type:
@@ -1560,6 +1565,11 @@ class SlotManagementView(generics.ListCreateAPIView):
     
     def get_queryset(self):
         queryset = ParkingSlot.objects.all().select_related('parking_lot')
+        
+        # Filter by parking zone if specified
+        parking_zone = self.request.query_params.get('parking_zone')
+        if parking_zone:
+            queryset = queryset.filter(parking_zone=parking_zone)
         
         # Filter by parking lot if specified
         parking_lot_id = self.request.query_params.get('parking_lot')

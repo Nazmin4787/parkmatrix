@@ -19,10 +19,14 @@ import ManageSlots from './pages/administration/ManageSlots';
 import EditSlot from './pages/administration/EditSlot';
 // REMOVED: View Bookings feature
 // import AdminListBookings from './pages/administration/list_bookings';
+import RateManagement from './pages/administration/RateManagement';
+import RateForm from './pages/administration/RateForm';
+import ZonePricingManagement from './pages/administration/ZonePricingManagement';
 import AccessLogs from './pages/admin/AccessLogs';
 import CheckInCheckOutLogs from './pages/administration/CheckInCheckOutLogs';
 import AdminUserHistory from './pages/administration/AdminUserHistory';
 import SlotStatusTracker from './pages/administration/SlotStatusTracker';
+import LongStayMonitor from './pages/admin/LongStayMonitor';
 import { getCurrentUser } from './store/userstore';
 import Navbar from './UIcomponents/Navbar';
 import ParkingMap from './pages/ParkingMap';
@@ -58,14 +62,20 @@ export default function MainApp() {
         <Route path="/phase8-test" element={<Phase8TestPage />} />
         <Route path="/user-debug" element={<UserDebug />} />
         <Route path="/admin" element={<Guard roles={['admin']}><AdminDashboard /></Guard>} />
+        <Route path="/admin/dashboard" element={<Guard roles={['admin']}><AdminDashboard /></Guard>} />
         <Route path="/admin/slots" element={<Guard roles={['admin']}><ManageSlots /></Guard>} />
         <Route path="/admin/slots/:id/edit" element={<Guard roles={['admin']}><EditSlot /></Guard>} />
+        <Route path="/admin/rates" element={<Guard roles={['admin']}><RateManagement /></Guard>} />
+        <Route path="/admin/rates/new" element={<Guard roles={['admin']}><RateForm /></Guard>} />
+        <Route path="/admin/rates/:id/edit" element={<Guard roles={['admin']}><RateForm /></Guard>} />
+        <Route path="/admin/zone-pricing" element={<Guard roles={['admin']}><ZonePricingManagement /></Guard>} />
         {/* REMOVED: View Bookings feature */}
         {/* <Route path="/admin/bookings" element={<Guard roles={['admin']}><AdminListBookings /></Guard>} /> */}
         <Route path="/admin/access-logs" element={<Guard roles={['admin']}><AccessLogs /></Guard>} />
         <Route path="/admin/checkin-checkout-logs" element={<Guard roles={['admin']}><CheckInCheckOutLogs /></Guard>} />
         <Route path="/admin/user-history" element={<Guard roles={['admin']}><AdminUserHistory /></Guard>} />
         <Route path="/admin/slot-tracker" element={<Guard roles={['admin']}><SlotStatusTracker /></Guard>} />
+        <Route path="/admin/long-stay" element={<Guard roles={['admin', 'security']}><LongStayMonitor /></Guard>} />
 
         <Route path="/nearest-parking" element={<NearestParking />} />
         <Route path="/parking-map" element={<ParkingMap />} />

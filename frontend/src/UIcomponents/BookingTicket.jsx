@@ -119,6 +119,10 @@ Generated on: ${new Date().toLocaleString()}
               <span className="value">{booking.slot_number ?? booking.slot_detail?.slot_number ?? `#${booking.slot}`}</span>
             </div>
             <div className="info-item">
+              <span className="label">Parking Location:</span>
+              <span className="value">{booking.slot?.parking_zone_display || booking.parking_zone_display || 'N/A'}</span>
+            </div>
+            <div className="info-item">
               <span className="label">Floor:</span>
               <span className="value">{booking.floor ?? booking.slot_detail?.floor ?? 'Ground'}</span>
             </div>

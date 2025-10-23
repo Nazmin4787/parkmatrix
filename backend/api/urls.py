@@ -1,4 +1,5 @@
 from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 from . import parking_search
 from .views import (
@@ -21,6 +22,40 @@ from . import checkin_checkout_log_views
 from . import user_history_views
 from .slot_tracking_views import SlotStatisticsView, DetailedSlotStatusView, SlotUpdatesView
 from .active_bookings_view import ActiveBookingsWithDetailsView
+
+# Parking Zone Management Views
+from .parking_zone_views import (
+    ParkingZoneListView,
+    SlotsByZoneView,
+    ZoneStatisticsView,
+    AdminZoneManagementView,
+    ZoneDashboardView
+)
+
+# Rate Management Views
+from .rate_views import (
+    PricingRateListCreateView,
+    PricingRateRetrieveUpdateDestroyView,
+    PricingRateByVehicleTypeView,
+    ActiveRatesView,
+    SetDefaultRateView,
+    CalculateParkingFeeView,
+    DefaultRatesByVehicleView
+)
+
+# Long-Stay Vehicle Detection Views
+from .long_stay_views import (
+    get_long_stay_vehicles,
+    trigger_long_stay_detection,
+    get_scheduler_status
+)
+
+# Zone Pricing Views
+from .zone_pricing_views import ZonePricingRateViewSet
+
+# Create router for zone pricing
+router = DefaultRouter()
+router.register(r'zone-pricing', ZonePricingRateViewSet, basename='zone-pricing')
 
 urlpatterns = [
     path('', APIRootView.as_view(), name='api-root'),
@@ -86,9 +121,9 @@ urlpatterns = [
     path('admin/slots/', views.SlotManagementView.as_view(), name='admin-slot-management'),
     path('admin/slots/<int:pk>/', views.SlotDetailView.as_view(), name='admin-slot-detail'),
     path('admin/slots/bulk-update/', views.BulkSlotUpdateView.as_view(), name='bulk-slot-update'),
+    path('admin/slots/statistics/', SlotStatisticsView.as_view(), name='slot-statistics'),
     
     # Slot tracking and statistics
-    path('slots/statistics/', SlotStatisticsView.as_view(), name='slot-statistics'),
     path('slots/detailed-status/', DetailedSlotStatusView.as_view(), name='detailed-slot-status'),
     path('slots/updates/', SlotUpdatesView.as_view(), name='slot-updates'),
     path('bookings/active-with-details/', ActiveBookingsWithDetailsView.as_view(), name='active-bookings-with-details'),
@@ -122,4 +157,57 @@ urlpatterns = [
     path('admin/user-history/<int:user_id>/', user_history_views.admin_user_history, name='admin-user-history'),
     path('admin/user-history/<int:user_id>/stats/', user_history_views.admin_user_stats, name='admin-user-stats'),
     path('admin/users/', user_history_views.admin_users_list, name='admin-users-list'),
+    
+    # ============================================================================
+    # PRICING RATE MANAGEMENT - Admin endpoints for managing parking rates
+    # ============================================================================
+    
+    # Admin: Manage rates (CRUD operations)
+    path('admin/rates/', PricingRateListCreateView.as_view(), name='pricing-rate-list-create'),
+    path('admin/rates/<int:pk>/', PricingRateRetrieveUpdateDestroyView.as_view(), name='pricing-rate-detail'),
+    path('admin/rates/<int:pk>/set-default/', SetDefaultRateView.as_view(), name='pricing-rate-set-default'),
+    path('admin/rates/by-vehicle/<str:vehicle_type>/', PricingRateByVehicleTypeView.as_view(), name='pricing-rate-by-vehicle'),
+    
+    # Public/User: View rates and calculate fees
+    path('rates/active/', ActiveRatesView.as_view(), name='active-rates'),
+    path('rates/defaults/', DefaultRatesByVehicleView.as_view(), name='default-rates'),
+    path('rates/calculate-fee/', CalculateParkingFeeView.as_view(), name='calculate-parking-fee'),
+    
+    # ============================================================================
+    # LONG-STAY VEHICLE DETECTION - Automated monitoring and alerts
+    # ============================================================================
+    
+    # Admin/Security: View long-stay vehicles
+    path('admin/long-stay-vehicles/', get_long_stay_vehicles, name='long-stay-vehicles'),
+    path('admin/long-stay-vehicles/detect/', trigger_long_stay_detection, name='trigger-long-stay-detection'),
+    path('admin/scheduler/status/', get_scheduler_status, name='scheduler-status'),
+    
+    # ============================================================================
+    # PARKING ZONE MANAGEMENT - Zone-wise slot organization
+    # ============================================================================
+    
+    # Public: View parking zones and slots by zone
+    path('parking-zones/', ParkingZoneListView.as_view(), name='parking-zones-list'),
+    path('parking-zones/<str:zone_code>/slots/', SlotsByZoneView.as_view(), name='slots-by-zone'),
+    path('parking-zones/<str:zone_code>/statistics/', ZoneStatisticsView.as_view(), name='zone-statistics'),
+    
+    # Admin: Manage zones and zone-wise slots
+    path('admin/parking-zones/dashboard/', ZoneDashboardView.as_view(), name='admin-zone-dashboard'),
+    path('admin/parking-zones/<str:zone_code>/', AdminZoneManagementView.as_view(), name='admin-zone-management'),
+    
+    # ============================================================================
+    # ZONE PRICING MANAGEMENT - Zone-specific pricing rates
+    # ============================================================================
+    
+    # Include router URLs for zone pricing (all admin-only endpoints)
+    # Available endpoints:
+    # - GET/POST /api/zone-pricing/ - List/create zone pricing rates
+    # - GET/PUT/PATCH/DELETE /api/zone-pricing/{id}/ - Manage specific rate
+    # - POST /api/zone-pricing/bulk_update/ - Bulk update rates
+    # - GET /api/zone-pricing/active_rates/ - Get all active rates
+    # - GET /api/zone-pricing/by_zone/?zone=ZONE_CODE - Get rates by zone
+    # - GET /api/zone-pricing/rate_summary/ - Get summary of all rates
 ]
+
+# Include router URLs
+urlpatterns += router.urls

@@ -7,6 +7,45 @@
 .filters-bar input, .filters-bar select { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; }
 .filters-bar .btn-clear { background: none; border: none; color: #667eea; cursor: pointer; }
 
+/* Zone filter styling */
+.zone-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.zone-filter label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.zone-select {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 200px;
+  transition: all 0.2s ease;
+}
+
+.zone-select:hover {
+  border-color: #667eea;
+}
+
+.zone-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 .slots-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -25,6 +64,19 @@
 .slot-card.available { border-left: 4px solid #00b894; }
 .slot-card.booked { border-left: 4px solid #e17055; opacity: 0.8; }
 .slot-card.incompatible { border-left: 4px solid #f39c12; }
+
+.slot-zone-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  margin: 4px 0;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
 .compatibility-warning {
   color: #f39c12;
   background-color: #fef9e7;
@@ -39,6 +91,32 @@
 .s-available { background: #e8faf6; color: #00b894; }
 .s-booked { background: #fdeeea; color: #e17055; }
 .slot-meta { display: flex; justify-content: space-between; color: #666; }
+
+/* Slot price styling */
+.slot-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.price-hourly {
+  font-weight: 700;
+  color: #27ae60;
+  font-size: 14px;
+}
+
+.price-daily {
+  font-size: 11px;
+  color: #7f8c8d;
+}
+
+.price-default {
+  font-weight: 600;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
 .slot-book-btn { 
   padding: 8px 12px; 
   border-radius: 10px; 

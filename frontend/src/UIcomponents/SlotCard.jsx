@@ -1,13 +1,10 @@
 import React from 'react';
 import '../stylesheets/slots.css';
 
-export default function SlotCard({ slot, onBook, disabled, userVehicleType }) {
+export default function SlotCard({ slot, onBook, disabled, userVehicleType, zonePricingRate }) {
   const isBooked = Boolean(slot.is_occupied);
-  // Fix compatibility logic - a slot is compatible if:
-  // 1. It's for "any" vehicle type, OR
-  // 2. User doesn't have a specific vehicle type selected, OR
-  // 3. The slot's vehicle type matches the user's vehicle type
-  const isCompatible = slot.vehicle_type === 'any' || !userVehicleType || slot.vehicle_type === userVehicleType;
+  // Allow all users to book any slot - remove compatibility restrictions
+  const isCompatible = true;
   
   const getVehicleTypeIcon = (type) => {
     const icons = {
@@ -31,33 +28,57 @@ export default function SlotCard({ slot, onBook, disabled, userVehicleType }) {
     return labels[type] || 'Any Vehicle';
   };
 
+  const getZoneDisplayName = (zoneCode) => {
+    const zoneNames = {
+      'COLLEGE_PARKING_CENTER': 'College Parking',
+      'HOME_PARKING_CENTER': 'Home Parking',
+      'METRO_PARKING_CENTER': 'Metro Parking',
+      'VIVIVANA_PARKING_CENTER': 'Vivivana Parking'
+    };
+    return zoneNames[zoneCode] || zoneCode;
+  };
+
   return (
-    <div className={`slot-card ${isBooked ? 'booked' : 'available'} ${!isCompatible ? 'incompatible' : ''}`}>
+    <div className={`slot-card ${isBooked ? 'booked' : 'available'}`}>
       <div className="slot-header">
         <div className="slot-code">{slot.slot_number}</div>
         <div className={`slot-status ${isBooked ? 's-booked' : 's-available'}`}>
           {isBooked ? 'Booked' : 'Available'}
         </div>
       </div>
+      
+      {/* Zone badge */}
+      {slot.parking_zone && (
+        <div className="slot-zone-badge">
+          📍 {slot.parking_zone_display || getZoneDisplayName(slot.parking_zone)}
+        </div>
+      )}
+      
       <div className="slot-meta">
         <div className="slot-floor">Floor {slot.floor}</div>
         <div className="slot-vehicle-type">
           <span className="vehicle-icon">{getVehicleTypeIcon(slot.vehicle_type)}</span>
           <span className="vehicle-label">{getVehicleTypeLabel(slot.vehicle_type)}</span>
         </div>
-        <div className="slot-price">$5/hr</div>
-      </div>
-      {!isCompatible && (
-        <div className="compatibility-warning">
-          Not compatible with your vehicle type
+        <div className="slot-price">
+          {zonePricingRate ? (
+            <>
+              <span className="price-hourly">₹{zonePricingRate.hourly_rate}/hr</span>
+              {zonePricingRate.daily_rate && (
+                <span className="price-daily">₹{zonePricingRate.daily_rate}/day</span>
+              )}
+            </>
+          ) : (
+            <span className="price-default">₹50/hr</span>
+          )}
         </div>
-      )}
+      </div>
       <button
         className={`slot-book-btn ${disabled ? 'booking' : ''}`}
         onClick={() => onBook && onBook(slot.id)}
-        disabled={isBooked || disabled || !isCompatible}
+        disabled={isBooked || disabled}
       >
-        {disabled ? 'Booking...' : isBooked ? 'Unavailable' : !isCompatible ? 'Incompatible' : 'Quick Book'}
+        {disabled ? 'Booking...' : isBooked ? 'Unavailable' : 'Quick Book'}
       </button>
     </div>
   );

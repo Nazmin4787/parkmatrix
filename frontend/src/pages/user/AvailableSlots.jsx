@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listAvailableSlots } from '../../services/parkingSlot';
 import { createBooking } from '../../services/bookingslot';
+import { getParkingZones, getAvailableSlotsByZone } from '../../services/parkingZone';
+import { getActiveRates } from '../../services/zonePricing';
 import SlotCard from '../../UIcomponents/SlotCard';
 import VehicleTypeSelector from '../../UIcomponents/VehicleTypeSelector';
 import Modal from '../../UIcomponents/Modal';
@@ -34,6 +36,14 @@ export default function AvailableSlots() {
   const [userVehicles, setUserVehicles] = useState([]);
   const [bookingInProgress, setBookingInProgress] = useState(new Set());
   
+  // Parking zone state
+  const [parkingZones, setParkingZones] = useState([]);
+  const [selectedZone, setSelectedZone] = useState('all');
+  
+  // Zone pricing state
+  const [zonePricingRates, setZonePricingRates] = useState([]);
+  const [currentRate, setCurrentRate] = useState(null);
+  
   // Enhanced booking modal state
   const [enhancedModal, setEnhancedModal] = useState({ open: false, slotId: null });
   const [bookingForm, setBookingForm] = useState({
@@ -52,6 +62,92 @@ export default function AvailableSlots() {
     duration: 1,  // Default duration in hours
   });
 
+  // Load parking zones
+  async function loadParkingZones() {
+    try {
+      const response = await getParkingZones();
+      console.log('Parking zones response:', response);
+      // Extract zones array from response
+      if (response && response.zones && Array.isArray(response.zones)) {
+        setParkingZones(response.zones);
+        console.log('Parking zones loaded:', response.zones);
+      } else {
+        console.error('Unexpected parking zones response structure:', response);
+        setParkingZones([]);
+      }
+    } catch (error) {
+      console.error('Error loading parking zones:', error);
+      setParkingZones([]);
+    }
+  }
+
+  // Load zone pricing rates
+  async function loadZonePricingRates() {
+    console.log('🎯🎯🎯 loadZonePricingRates FUNCTION CALLED!');
+    try {
+      console.log('🔄 Starting to load zone pricing rates...');
+      const response = await getActiveRates();
+      console.log('📥 Zone pricing rates response:', response);
+      console.log('📥 Response type:', typeof response);
+      console.log('📥 Is array?', Array.isArray(response));
+      
+      // Backend returns array directly, not wrapped in {rates: [...]}
+      if (Array.isArray(response)) {
+        setZonePricingRates(response);
+        console.log('✅ Zone pricing rates loaded successfully! Count:', response.length);
+        console.log('📋 Rates:', response);
+        
+        // Immediately check if state was updated
+        setTimeout(() => {
+          console.log('⏰ State check after 100ms:', zonePricingRates);
+        }, 100);
+      } else if (response && Array.isArray(response.rates)) {
+        setZonePricingRates(response.rates);
+        console.log('✅ Zone pricing rates loaded (from .rates)! Count:', response.rates.length);
+      } else {
+        console.error('❌ Unexpected zone pricing rates response structure:', response);
+        setZonePricingRates([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading zone pricing rates:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      setZonePricingRates([]);
+    }
+    console.log('🏁 loadZonePricingRates FUNCTION COMPLETED');
+  }
+
+  // Get rate for specific zone and vehicle type
+  const getRateForZoneAndVehicle = (parkingZone, vehicleType) => {
+    console.log(`🔍 getRateForZoneAndVehicle called: zone="${parkingZone}", vehicle="${vehicleType}"`);
+    console.log(`📊 zonePricingRates state:`, zonePricingRates);
+    console.log(`📊 zonePricingRates length:`, zonePricingRates?.length || 0);
+    
+    if (!zonePricingRates || zonePricingRates.length === 0) {
+      console.log('❌ No zone pricing rates loaded yet');
+      return null;
+    }
+    
+    console.log(`🔍 Looking for rate: zone="${parkingZone}", vehicle="${vehicleType}"`);
+    console.log('📋 Available rates:', zonePricingRates);
+    
+    const rate = zonePricingRates.find(
+      r => r.parking_zone === parkingZone && r.vehicle_type === vehicleType
+    );
+    
+    if (rate) {
+      console.log('✅ Found rate:', rate);
+    } else {
+      console.log(`❌ No rate found for zone="${parkingZone}", vehicle="${vehicleType}"`);
+      console.log('Available combinations:');
+      zonePricingRates.forEach(r => {
+        console.log(`  - ${r.parking_zone} / ${r.vehicle_type}`);
+      });
+    }
+    
+    return rate;
+  };
+
   async function load() {
     setIsLoading(true); // Start loading
     setMessage('');
@@ -69,34 +165,24 @@ export default function AvailableSlots() {
     try {
       console.log('Loading available slots...');
       
-      // Fetch user's default vehicle and vehicles
-      let defaultVehicle = null;
+      // Fetch user's vehicles for booking form population
       let userVehicles = [];
       try {
-        // First try to get user's default vehicle
-        defaultVehicle = await getDefaultVehicle();
-        console.log('Default vehicle loaded:', defaultVehicle);
-        
-        // Also fetch all user vehicles to populate the booking form later
+        // Fetch all user vehicles to populate the booking form later
         userVehicles = await getMyVehicles();
         console.log('User vehicles loaded:', userVehicles);
-        
-        // If we have vehicles but no default, use the first one
-        if (!defaultVehicle && userVehicles && userVehicles.length > 0) {
-          defaultVehicle = userVehicles[0];
-          console.log('No default vehicle found, using first vehicle:', defaultVehicle);
-        }
         
         // Store user vehicles in state
         setUserVehicles(userVehicles || []);
         
-        // If we have default vehicle info, populate the vehicle details
-        if (defaultVehicle) {
+        // If we have vehicles, populate the vehicle details with the first one for convenience
+        if (userVehicles && userVehicles.length > 0) {
+          const firstVehicle = userVehicles.find(v => v.is_default) || userVehicles[0];
           setVehicleDetails({
-            number_plate: defaultVehicle.number_plate || '',
-            vehicle_type: defaultVehicle.vehicle_type || 'car',
-            model: defaultVehicle.model || '',
-            color: defaultVehicle.color || ''
+            number_plate: firstVehicle.number_plate || '',
+            vehicle_type: firstVehicle.vehicle_type || 'car',
+            model: firstVehicle.model || '',
+            color: firstVehicle.color || ''
           });
         }
       } catch (vehicleError) {
@@ -106,19 +192,23 @@ export default function AvailableSlots() {
           setIsLoading(false);
           return;
         }
-        // Continue without default vehicle for other errors
+        // Continue without vehicle data for other errors
       }
       
-      const vehicleType = defaultVehicle ? defaultVehicle.vehicle_type : null;
-      setUserDefaultVehicleType(vehicleType);
-      console.log('Set user default vehicle type:', vehicleType);
-
-      // If no filter is selected, use the user's default vehicle type for the initial fetch
-      const filterToUse = selectedVehicleType !== null ? selectedVehicleType : vehicleType;
+      // Use the selected vehicle type filter (from dropdown), or null to show all slots
+      const filterToUse = selectedVehicleType !== null ? selectedVehicleType : null;
       console.log('Using filter:', filterToUse);
       
       try {
-        const data = await listAvailableSlots(filterToUse);
+        let data;
+        // If a specific zone is selected, use zone-specific API
+        if (selectedZone && selectedZone !== 'ALL') {
+          console.log('Loading slots for zone:', selectedZone);
+          data = await getAvailableSlotsByZone(selectedZone, filterToUse);
+        } else {
+          console.log('Loading all available slots');
+          data = await listAvailableSlots(filterToUse);
+        }
         console.log('Slots data received:', data);
         
         // Check if data has the correct structure and extract slots array
@@ -157,14 +247,20 @@ export default function AvailableSlots() {
     if (!user) {
       console.log('User not authenticated, redirecting to login');
       navigate('/signin', { state: { from: '/slots' } });
+    } else {
+      console.log('✅ User authenticated, loading parking data...');
+      // Load parking zones and pricing rates on mount
+      loadParkingZones();
+      console.log('🎯 Calling loadZonePricingRates...');
+      loadZonePricingRates();
     }
   }, [navigate]);
 
-  // Load data on component mount and when vehicle type changes
+  // Load data on component mount and when vehicle type or zone changes
   useEffect(() => { 
-    console.log('AvailableSlots component mounted or selectedVehicleType changed:', selectedVehicleType);
+    console.log('AvailableSlots component mounted or filters changed:', { selectedVehicleType, selectedZone });
     load(); 
-  }, [selectedVehicleType]);
+  }, [selectedVehicleType, selectedZone]);
   
   // Redirect to login if authentication error occurs
   useEffect(() => {
@@ -191,10 +287,16 @@ export default function AvailableSlots() {
       return;
     }
 
+    // Find the slot to get its parking zone
+    const slot = slots.find(s => s.id === slotId);
+    console.log('Selected slot:', slot);
+
     // Pre-populate form with user's default vehicle if available
+    let selectedVehicleType = 'car';
     if (userVehicles && userVehicles.length > 0) {
       const defaultVehicle = userVehicles.find(v => v.is_default) || userVehicles[0];
       if (defaultVehicle) {
+        selectedVehicleType = defaultVehicle.vehicle_type;
         setBookingForm(prev => ({
           ...prev,
           numberPlate: defaultVehicle.number_plate,
@@ -212,6 +314,13 @@ export default function AvailableSlots() {
         model: '',
         color: ''
       }));
+    }
+
+    // Get the rate for this slot and vehicle type
+    if (slot && slot.parking_zone) {
+      const rate = getRateForZoneAndVehicle(slot.parking_zone, selectedVehicleType);
+      setCurrentRate(rate);
+      console.log('Set current rate for booking:', rate);
     }
 
     // Always open the enhanced booking modal - let user enter details
@@ -277,7 +386,7 @@ export default function AvailableSlots() {
       };
 
       const bookingData = {
-        slot: parseInt(slotId),
+        slot_id: parseInt(slotId),
         vehicle: vehicleData,
         start_time: startTime,
         end_time: endTime
@@ -324,6 +433,16 @@ export default function AvailableSlots() {
   // Form handlers
   const handleBookingFormChange = (field, value) => {
     setBookingForm(prev => ({ ...prev, [field]: value }));
+    
+    // Update rate when vehicle type changes
+    if (field === 'vehicleType' && enhancedModal.slotId) {
+      const slot = slots.find(s => s.id === enhancedModal.slotId);
+      if (slot && slot.parking_zone) {
+        const rate = getRateForZoneAndVehicle(slot.parking_zone, value);
+        setCurrentRate(rate);
+        console.log('Updated rate for vehicle type change:', rate);
+      }
+    }
   };
 
   const handleVehicleSelection = (vehicleId) => {
@@ -352,8 +471,25 @@ export default function AvailableSlots() {
 
   // Calculate estimated price (placeholder calculation)
   const calculatePrice = () => {
-    const hourlyRate = 50; // Base rate per hour
-    return bookingForm.duration * hourlyRate;
+    if (!currentRate) {
+      // Fallback to base rate if no zone pricing found
+      const hourlyRate = 50;
+      return bookingForm.duration * hourlyRate;
+    }
+
+    const duration = bookingForm.duration;
+    const bookingDate = new Date(bookingForm.date);
+    const isWeekend = bookingDate.getDay() === 0 || bookingDate.getDay() === 6;
+
+    // Calculate based on duration
+    if (duration >= 24) {
+      // Use daily rate for 24+ hours
+      const days = Math.ceil(duration / 24);
+      return days * (isWeekend && currentRate.weekend_rate ? currentRate.weekend_rate : currentRate.daily_rate);
+    } else {
+      // Use hourly rate for less than 24 hours
+      return duration * (isWeekend && currentRate.weekend_rate ? currentRate.weekend_rate : currentRate.hourly_rate);
+    }
   };
 
   async function book(id, vehicle, bookingInfo) {
@@ -455,7 +591,7 @@ export default function AvailableSlots() {
       
       // Prepare booking data
       const bookingData = { 
-        slot: id, 
+        slot_id: id, 
         vehicle: completeVehicle, 
         start_time: startTime, 
         end_time: endTime
@@ -589,6 +725,25 @@ export default function AvailableSlots() {
           selectedType={selectedVehicleType}
           onTypeChange={handleVehicleTypeChange}
         />
+        
+        {/* Parking Zone Selector */}
+        <div className="zone-filter">
+          <label htmlFor="zone-select">📍 Parking Zone:</label>
+          <select 
+            id="zone-select"
+            value={selectedZone} 
+            onChange={(e) => setSelectedZone(e.target.value)}
+            className="zone-select"
+          >
+            <option value="ALL">All Zones</option>
+            {parkingZones && parkingZones.length > 0 && parkingZones.map(zone => (
+              <option key={zone.code} value={zone.code}>
+                {zone.name} ({zone.available_slots} available)
+              </option>
+            ))}
+          </select>
+        </div>
+        
         <input
           type="text"
           className="search-input"
@@ -606,15 +761,36 @@ export default function AvailableSlots() {
         </div>
       ) : (
         <div className="slots-grid">
-          {search(filtered).map((slot) => (
-            <SlotCard
-              key={slot.id}
-              slot={slot}
-              onBook={() => quickBook(slot.id)}
-              disabled={bookingInProgress.has(slot.id)}
-              userVehicleType={userDefaultVehicleType} // Pass user's default vehicle type
-            />
-          ))}
+          {search(filtered).map((slot) => {
+            // Get all rates for this slot's parking zone to show all vehicle type options
+            const slotRates = {};
+            const vehicleTypes = ['car', 'bike', 'suv', 'truck'];
+            
+            vehicleTypes.forEach(vType => {
+              const rate = getRateForZoneAndVehicle(slot.parking_zone, vType);
+              if (rate) {
+                slotRates[vType] = rate;
+              }
+            });
+            
+            // Get the rate for this specific slot's vehicle type as default
+            const defaultRate = getRateForZoneAndVehicle(
+              slot.parking_zone, 
+              slot.vehicle_type
+            );
+            
+            return (
+              <SlotCard
+                key={slot.id}
+                slot={slot}
+                onBook={() => quickBook(slot.id)}
+                disabled={bookingInProgress.has(slot.id)}
+                userVehicleType={userDefaultVehicleType} // Pass user's default vehicle type
+                zonePricingRate={defaultRate} // Pass zone pricing rate for this slot's vehicle type
+                allRates={slotRates} // Pass all rates for this zone
+              />
+            );
+          })}
         </div>
       )}
 
@@ -756,6 +932,10 @@ export default function AvailableSlots() {
                 <span>{slots.find(s => s.id === enhancedModal.slotId)?.slot_number}</span>
               </div>
               <div className="summary-item">
+                <span>Parking Zone:</span>
+                <span>{slots.find(s => s.id === enhancedModal.slotId)?.parking_zone || 'N/A'}</span>
+              </div>
+              <div className="summary-item">
                 <span>Date:</span>
                 <span>{bookingForm.date ? new Date(bookingForm.date).toLocaleDateString() : 'Not selected'}</span>
               </div>
@@ -767,7 +947,34 @@ export default function AvailableSlots() {
                 <span>Vehicle:</span>
                 <span>{bookingForm.numberPlate || 'Not entered'}</span>
               </div>
-              <div className="summary-item">
+              
+              {/* Show rate details if available */}
+              {currentRate && (
+                <>
+                  <div className="summary-divider"></div>
+                  <div className="summary-item">
+                    <span>Rate Plan:</span>
+                    <span style={{ fontWeight: 500, color: '#5C6BC0' }}>{currentRate.rate_name}</span>
+                  </div>
+                  <div className="summary-item" style={{ fontSize: '0.9em', color: '#666' }}>
+                    <span>Hourly Rate:</span>
+                    <span>₹{currentRate.hourly_rate}/hr</span>
+                  </div>
+                  <div className="summary-item" style={{ fontSize: '0.9em', color: '#666' }}>
+                    <span>Daily Rate:</span>
+                    <span>₹{currentRate.daily_rate}/day</span>
+                  </div>
+                  {currentRate.weekend_rate && (
+                    <div className="summary-item" style={{ fontSize: '0.9em', color: '#666' }}>
+                      <span>Weekend Rate:</span>
+                      <span>₹{currentRate.weekend_rate}/hr</span>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              <div className="summary-divider"></div>
+              <div className="summary-item" style={{ fontSize: '1.1em', fontWeight: 'bold', color: '#27ae60' }}>
                 <span>Estimated Total:</span>
                 <span>₹{calculatePrice()}</span>
               </div>

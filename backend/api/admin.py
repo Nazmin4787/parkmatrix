@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, ParkingSlot, Booking, PricingRate, Vehicle, ParkingLot, AccessLog
+from .models import User, ParkingSlot, Booking, PricingRate, Vehicle, ParkingLot, AccessLog, ZonePricingRate
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
@@ -77,3 +77,61 @@ class AccessLogAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         # Only superusers can delete access logs
         return request.user.is_superuser
+
+
+@admin.register(ZonePricingRate)
+class ZonePricingRateAdmin(admin.ModelAdmin):
+    list_display = ('rate_name', 'parking_zone_display', 'vehicle_type_display', 'hourly_rate', 'daily_rate', 'is_active', 'is_valid')
+    list_filter = ('parking_zone', 'vehicle_type', 'is_active', 'effective_from')
+    search_fields = ('rate_name', 'description')
+    readonly_fields = ('created_at', 'updated_at', 'created_by')
+    date_hierarchy = 'effective_from'
+    ordering = ('-created_at',)
+    
+    fieldsets = (
+        ('Zone & Vehicle Information', {
+            'fields': ('parking_zone', 'vehicle_type', 'rate_name', 'description')
+        }),
+        ('Pricing', {
+            'fields': ('hourly_rate', 'daily_rate', 'weekend_rate')
+        }),
+        ('Status & Validity', {
+            'fields': ('is_active', 'effective_from', 'effective_to')
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def parking_zone_display(self, obj):
+        return obj.get_parking_zone_display()
+    parking_zone_display.short_description = 'Parking Zone'
+    parking_zone_display.admin_order_field = 'parking_zone'
+    
+    def vehicle_type_display(self, obj):
+        return obj.get_vehicle_type_display()
+    vehicle_type_display.short_description = 'Vehicle Type'
+    vehicle_type_display.admin_order_field = 'vehicle_type'
+    
+    def is_valid(self, obj):
+        return obj.is_valid_now()
+    is_valid.short_description = 'Currently Valid'
+    is_valid.boolean = True
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # If creating new object
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+    
+    actions = ['activate_rates', 'deactivate_rates']
+    
+    def activate_rates(self, request, queryset):
+        queryset.update(is_active=True)
+        self.message_user(request, f'{queryset.count()} rates activated')
+    activate_rates.short_description = "Activate selected rates"
+    
+    def deactivate_rates(self, request, queryset):
+        queryset.update(is_active=False)
+        self.message_user(request, f'{queryset.count()} rates deactivated')
+    deactivate_rates.short_description = "Deactivate selected rates"

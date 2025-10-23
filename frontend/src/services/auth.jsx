@@ -63,7 +63,7 @@ export async function loginUser({ email, password }) {
 export async function logoutUser() {
   try {
     const session_id = localStorage.getItem('session_id');
-    const access_token = localStorage.getItem('access_token');
+    const access_token = localStorage.getItem('accessToken'); // Changed from 'access_token' to 'accessToken'
     
     if (session_id && access_token) {
       // Call logout endpoint to update logout timestamp

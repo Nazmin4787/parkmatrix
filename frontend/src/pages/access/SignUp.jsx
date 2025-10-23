@@ -8,7 +8,6 @@ export default function SignUp() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('customer');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -16,9 +15,10 @@ export default function SignUp() {
     e.preventDefault();
     setError('');
     try {
-      const data = await registerUser({ username, email, password, role });
+      // Always register as customer role
+      const data = await registerUser({ username, email, password, role: 'customer' });
       saveSession(data);
-      navigate(role === 'admin' ? '/admin' : '/');
+      navigate('/dashboard');
     } catch (err) {
       setError('Registration failed');
     }
@@ -36,12 +36,6 @@ export default function SignUp() {
         </label>
         <label>Password
           <input value={password} onChange={e => setPassword(e.target.value)} type="password" required />
-        </label>
-        <label>Role
-          <select value={role} onChange={e => setRole(e.target.value)}>
-            <option value="customer">Customer</option>
-            <option value="admin">Admin</option>
-          </select>
         </label>
         {error && <div className="error">{error}</div>}
         <button type="submit" className="btn-primary small">Create Account</button>

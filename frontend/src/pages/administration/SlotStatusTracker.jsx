@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSlotStatistics, getDetailedSlotStatus } from '../../services/slotTracking';
+import { getSlotStatistics, getDetailedSlotStatus, getActiveBookings } from '../../services/slotTracking';
 import { listAllSlots } from '../../services/parkingSlot';
 import './SlotStatusTracker.css';
 
@@ -72,43 +72,24 @@ const SlotStatusTracker = () => {
   const fetchSlotDetails = async () => {
     try {
       console.log("Fetching slot details...");
-      // Fetch all slots
-      const allSlots = await listAllSlots();
-      console.log("All slots:", allSlots); // Debug log
+      // Fetch all slots and active bookings
+      const [allSlots, activeBookings] = await Promise.all([
+        listAllSlots(),
+        getActiveBookings()
+      ]);
       
-      // Create demo booking data for display purposes
-      const demoBookings = [
-        {
-          slotId: "A01",
-          vehicleNo: "MH-01-AB-1234",
-          vehicleType: "car",
-          userId: "user101",
-          checkIn: "2025-10-21T13:47:26.611154",
-          checkOut: "2025-10-21T13:48:53.053231"
-        },
-        {
-          slotId: "A04",
-          vehicleNo: "MH-02-XY-5678", 
-          vehicleType: "suv",
-          userId: "user202",
-          checkIn: "2025-10-21T12:37:35.126387",
-          checkOut: null
-        },
-        {
-          slotId: "A15",
-          vehicleNo: "MH-01-CD-9876",
-          vehicleType: "bike",
-          userId: "user303",
-          checkIn: "2025-10-21T07:11:00.000000",
-          checkOut: null
-        }
-      ];
-
-      // Create a lookup map for demo bookings
+      console.log("All slots:", allSlots);
+      console.log("Active bookings:", activeBookings);
+      
+      // Create a lookup map for active bookings by slot_number
       const bookingMap = {};
-      demoBookings.forEach(booking => {
-        bookingMap[booking.slotId] = booking;
-      });
+      if (activeBookings && Array.isArray(activeBookings)) {
+        activeBookings.forEach(booking => {
+          if (booking && booking.slot_number) {
+            bookingMap[booking.slot_number] = booking;
+          }
+        });
+      }
       
       // Apply filters to slots
       let filteredSlots = [...allSlots];
@@ -123,10 +104,10 @@ const SlotStatusTracker = () => {
       // Apply vehicle type filter
       if (filterVehicleType !== 'all') {
         filteredSlots = filteredSlots.filter(slot => {
-          // Check if this is a demo occupied slot
-          const demoBooking = bookingMap[slot.slot_number];
-          if (slot.is_occupied && demoBooking) {
-            return demoBooking.vehicleType === filterVehicleType;
+          // Check if this slot has an active booking
+          const booking = bookingMap[slot.slot_number];
+          if (slot.is_occupied && booking) {
+            return booking.vehicle_type === filterVehicleType;
           }
           // Otherwise check the slot's designated vehicle type
           return slot.vehicle_type === filterVehicleType;
@@ -135,43 +116,28 @@ const SlotStatusTracker = () => {
       
       // Transform slot data for display
       const transformedSlots = filteredSlots.map(slot => {
-        // Check if we have demo data for this slot
-        const demoBooking = bookingMap[slot.slot_number];
+        // Check if we have booking data for this slot
+        const booking = bookingMap[slot.slot_number];
         const isOccupied = slot.is_occupied;
-        
-        // Determine what to display
-        let vehicleNo = '';
-        let vehicleType = slot.vehicle_type || 'any';
-        let userId = '';
-        let checkIn = '';
-        let checkOut = '';
-        
-        // If the slot has demo data, use it
-        if (demoBooking) {
-          vehicleNo = demoBooking.vehicleNo;
-          vehicleType = demoBooking.vehicleType;
-          userId = demoBooking.userId;
-          checkIn = demoBooking.checkIn;
-          checkOut = demoBooking.checkOut;
-        }
         
         return {
           id: slot.id,
           slotId: slot.slot_number,
           status: isOccupied ? 'Occupied' : 'Free',
-          vehicleNo: isOccupied ? vehicleNo : '',
-          vehicleType: vehicleType,
-          userId: isOccupied ? userId : '',
-          checkIn: isOccupied ? checkIn : '',
-          checkOut: isOccupied ? (checkOut || '') : '',
-          location: `${slot.section}-${slot.floor}`
+          vehicleNo: (isOccupied && booking && booking.vehicle_no) ? booking.vehicle_no : '',
+          vehicleType: (booking && booking.vehicle_type) ? booking.vehicle_type : slot.vehicle_type || 'any',
+          userId: (isOccupied && booking && booking.user_id) ? booking.user_id : '',
+          checkIn: (isOccupied && booking && booking.check_in_time) ? booking.check_in_time : '',
+          checkOut: (isOccupied && booking) ? (booking.checked_out_at || '') : '',
+          parkingZone: slot.parking_zone_display || 'Unknown'
         };
       });
 
       setSlotDetails(transformedSlots);
     } catch (err) {
       console.error('Error fetching slot details:', err);
-      throw err;
+      // Don't throw error, just set empty array to prevent crash
+      setSlotDetails([]);
     }
   };
 
@@ -303,7 +269,7 @@ const SlotStatusTracker = () => {
                 <th>User ID</th>
                 <th>Check-In</th>
                 <th>Check-Out</th>
-                <th>Location</th>
+                <th>Parking Zone</th>
               </tr>
             </thead>
             <tbody>
@@ -325,7 +291,7 @@ const SlotStatusTracker = () => {
                     <td>{slot.status === 'Occupied' ? slot.userId : '-'}</td>
                     <td>{slot.status === 'Occupied' ? formatTime(slot.checkIn) : '-'}</td>
                     <td>{slot.status === 'Occupied' ? (slot.checkOut ? formatTime(slot.checkOut) : 'Active') : '-'}</td>
-                    <td>{slot.location || '-'}</td>
+                    <td>{slot.parkingZone || '-'}</td>
                   </tr>
                 ))
               ) : (

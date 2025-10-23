@@ -40,36 +40,121 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div>
-      <h2>Admin Dashboard</h2>
+    <div className="admin-dashboard-container">
+      <div className="dashboard-header">
+        <h2>🎛️ Admin Dashboard</h2>
+        <p className="dashboard-subtitle">Monitor and manage your parking system</p>
+      </div>
 
+      {/* Statistics Cards */}
       <div className="kpis">
-        <div className="kpi-card">
-          <div className="kpi-label">Total Slots</div>
-          <div className="kpi-value">{loading ? '...' : slotStats.total}</div>
+        <div className="kpi-card kpi-total">
+          <div className="kpi-icon">🏢</div>
+          <div className="kpi-content">
+            <div className="kpi-label">Total Slots</div>
+            <div className="kpi-value">{loading ? '...' : slotStats.total}</div>
+          </div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Occupied Slots</div>
-          <div className="kpi-value">{loading ? '...' : slotStats.occupied}</div>
+        <div className="kpi-card kpi-occupied">
+          <div className="kpi-icon">🚗</div>
+          <div className="kpi-content">
+            <div className="kpi-label">Occupied Slots</div>
+            <div className="kpi-value">{loading ? '...' : slotStats.occupied}</div>
+          </div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Free Slots</div>
-          <div className="kpi-value">{loading ? '...' : slotStats.free}</div>
+        <div className="kpi-card kpi-free">
+          <div className="kpi-icon">✅</div>
+          <div className="kpi-content">
+            <div className="kpi-label">Free Slots</div>
+            <div className="kpi-value">{loading ? '...' : slotStats.free}</div>
+          </div>
         </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Occupancy Rate</div>
-          <div className="kpi-value">{loading ? '...' : slotStats.rate + '%'}</div>
+        <div className="kpi-card kpi-rate">
+          <div className="kpi-icon">📊</div>
+          <div className="kpi-content">
+            <div className="kpi-label">Occupancy Rate</div>
+            <div className="kpi-value">{loading ? '...' : slotStats.rate + '%'}</div>
+          </div>
+          <div className="kpi-progress">
+            <div className="kpi-progress-bar" style={{width: `${slotStats.rate}%`}}></div>
+          </div>
         </div>
       </div>
 
-      <div className="admin-actions">
-        <Link className="btn-primary small" to="/admin/slots">Manage Slots</Link>
-        <Link className="btn-outline" to="/admin/slot-tracker">🅿️ Track Parking Slots</Link>
-        {/* REMOVED: View Bookings feature */}
-        {/* <Link className="btn-outline" to="/admin/bookings">View Bookings</Link> */}
-        <Link className="btn-outline" to="/admin/access-logs">📋 View Access Logs</Link>
-        <Link className="btn-outline" to="/admin/checkin-checkout-logs">🚗 Check-In/Out Logs</Link>
-        <Link className="btn-outline" to="/admin/user-history">👥 User Parking History</Link>
+      {/* Quick Actions Section */}
+      <div className="dashboard-section">
+        <h3 className="section-title">⚡ Quick Actions</h3>
+        <div className="admin-actions-grid">
+          <Link className="action-card action-primary" to="/admin/slots">
+            <div className="action-icon">🎯</div>
+            <div className="action-content">
+              <div className="action-title">Manage Slots</div>
+              <div className="action-desc">Add, edit or remove parking slots</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-secondary" to="/admin/rates">
+            <div className="action-icon">💰</div>
+            <div className="action-content">
+              <div className="action-title">Manage Rates</div>
+              <div className="action-desc">Configure parking rates</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-secondary" to="/admin/zone-pricing">
+            <div className="action-icon">🏷️</div>
+            <div className="action-content">
+              <div className="action-title">Zone Pricing</div>
+              <div className="action-desc">Zone-specific pricing rates</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-warning" to="/admin/long-stay">
+            <div className="action-icon action-pulse">🚨</div>
+            <div className="action-content">
+              <div className="action-title">Long-Stay Monitor</div>
+              <div className="action-desc">Track vehicles exceeding time limits</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-info" to="/admin/slot-tracker">
+            <div className="action-icon">🅿️</div>
+            <div className="action-content">
+              <div className="action-title">Track Parking</div>
+              <div className="action-desc">Real-time slot monitoring</div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Logs & Reports Section */}
+      <div className="dashboard-section">
+        <h3 className="section-title">📊 Logs & Reports</h3>
+        <div className="admin-actions-grid reports-grid">
+          <Link className="action-card action-outline" to="/admin/access-logs">
+            <div className="action-icon">📋</div>
+            <div className="action-content">
+              <div className="action-title">Access Logs</div>
+              <div className="action-desc">View system access history</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-outline" to="/admin/checkin-checkout-logs">
+            <div className="action-icon">🚗</div>
+            <div className="action-content">
+              <div className="action-title">Check-In/Out Logs</div>
+              <div className="action-desc">Monitor vehicle entries & exits</div>
+            </div>
+          </Link>
+
+          <Link className="action-card action-outline" to="/admin/user-history">
+            <div className="action-icon">👥</div>
+            <div className="action-content">
+              <div className="action-title">User History</div>
+              <div className="action-desc">View user parking records</div>
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );

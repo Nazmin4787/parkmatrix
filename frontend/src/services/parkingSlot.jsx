@@ -63,11 +63,12 @@ export const findNearestSlot = async (lat = 19.205, lon = 73.156, vehicleType = 
 };
 
 // Admin API functions for vehicle type management
-export async function adminListSlots(vehicleType = null, parkingLot = null) {
+export async function adminListSlots(vehicleType = null, parkingLot = null, parkingZone = null) {
     let url = '/api/admin/slots/';
     const params = new URLSearchParams();
     if (vehicleType) params.append('vehicle_type', vehicleType);
     if (parkingLot) params.append('parking_lot', parkingLot);
+    if (parkingZone) params.append('parking_zone', parkingZone);
     if (params.toString()) url += `?${params.toString()}`;
     
     const { data } = await http.get(url);

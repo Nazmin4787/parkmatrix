@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification, AuditLog, AccessLog
+from .models import User, ParkingSlot, Booking, ParkingLot, Vehicle, Notification, AuditLog, AccessLog, PricingRate, ZonePricingRate
 from datetime import timedelta
 from django.utils import timezone
 
@@ -43,10 +43,11 @@ class ParkingSlotSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     parking_lot = ParkingLotSerializer(read_only=True)
     is_compatible = serializers.SerializerMethodField()
+    parking_zone_display = serializers.SerializerMethodField()
     
     class Meta:
         model = ParkingSlot
-        fields = ['id', 'slot_number', 'floor', 'section', 'is_occupied', 'vehicle_type', 'parking_lot', 'is_compatible']
+        fields = ['id', 'slot_number', 'floor', 'section', 'is_occupied', 'vehicle_type', 'parking_lot', 'is_compatible', 'parking_zone', 'parking_zone_display']
     
     def get_is_compatible(self, obj):
         """Check if slot is compatible with user's vehicle types"""
@@ -55,6 +56,10 @@ class ParkingSlotSerializer(serializers.ModelSerializer):
             user_vehicle_types = request.user.vehicle_set.values_list('vehicle_type', flat=True)
             return any(obj.is_compatible_with_vehicle(v_type) for v_type in user_vehicle_types)
         return True
+    
+    def get_parking_zone_display(self, obj):
+        """Get human-readable zone name"""
+        return obj.get_parking_zone_display()
 
 class VehicleSerializer(serializers.ModelSerializer):
 
@@ -93,7 +98,15 @@ class PricingRateSerializer(serializers.ModelSerializer):
 class BookingSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     vehicle = VehicleSerializer(required=False) # Made not required for updates
-    slot = serializers.PrimaryKeyRelatedField(queryset=ParkingSlot.objects.all())
+    slot = ParkingSlotSerializer(read_only=True)
+    slot_id = serializers.PrimaryKeyRelatedField(
+        queryset=ParkingSlot.objects.all(),
+        source='slot',
+        write_only=True
+    )
+    
+    # Add parking zone display for direct access
+    parking_zone_display = serializers.SerializerMethodField()
     
     # Use CharField for start/end time to accept various formats
     start_time = serializers.DateTimeField()
@@ -106,19 +119,25 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            'id', 'user', 'slot', 'vehicle', 'start_time', 'end_time', 
-            'total_price', 'is_active', 'initial_end_time', 'extension_count',
-            'status', 'checked_in_at', 'checked_in_by', 'checked_in_ip',
-            'check_in_notes', 'checked_out_at', 'checked_out_by', 
-            'checked_out_ip', 'check_out_notes', 'actual_duration_minutes',
-            'overtime_minutes', 'overtime_amount'
+            'id', 'user', 'slot', 'slot_id', 'parking_zone_display', 'vehicle', 
+            'start_time', 'end_time', 'total_price', 'is_active', 
+            'initial_end_time', 'extension_count', 'status', 'checked_in_at', 
+            'checked_in_by', 'checked_in_ip', 'check_in_notes', 'checked_out_at', 
+            'checked_out_by', 'checked_out_ip', 'check_out_notes', 
+            'actual_duration_minutes', 'overtime_minutes', 'overtime_amount'
         ]
         read_only_fields = [
-            'user', 'total_price', 'initial_end_time', 'extension_count',
-            'status', 'checked_in_at', 'checked_in_by', 'checked_in_ip',
+            'user', 'slot', 'parking_zone_display', 'total_price', 'initial_end_time', 
+            'extension_count', 'status', 'checked_in_at', 'checked_in_by', 'checked_in_ip',
             'checked_out_at', 'checked_out_by', 'checked_out_ip',
             'actual_duration_minutes', 'overtime_minutes', 'overtime_amount'
         ]
+    
+    def get_parking_zone_display(self, obj):
+        """Get the human-readable parking zone name"""
+        if obj.slot and obj.slot.parking_zone:
+            return obj.slot.get_parking_zone_display()
+        return None
 
     def validate(self, data):
         start_time = data.get('start_time')
@@ -285,10 +304,15 @@ class NotificationSerializer(serializers.ModelSerializer):
 # Add a new serializer for admin slot management
 class AdminParkingSlotSerializer(serializers.ModelSerializer):
     parking_lot_name = serializers.CharField(source='parking_lot.name', read_only=True)
+    parking_zone_display = serializers.SerializerMethodField()
     
     class Meta:
         model = ParkingSlot
-        fields = ['id', 'slot_number', 'floor', 'section', 'vehicle_type', 'is_occupied', 'parking_lot', 'parking_lot_name', 'pos_x', 'pos_y', 'height_cm', 'width_cm', 'length_cm']
+        fields = ['id', 'slot_number', 'floor', 'section', 'vehicle_type', 'is_occupied', 'parking_lot', 'parking_lot_name', 'pos_x', 'pos_y', 'height_cm', 'width_cm', 'length_cm', 'parking_zone', 'parking_zone_display']
+    
+    def get_parking_zone_display(self, obj):
+        """Get human-readable zone name"""
+        return obj.get_parking_zone_display()
 
 
 # Check-in/Check-out Serializers
@@ -468,24 +492,46 @@ class AuditLogListSerializer(serializers.ModelSerializer):
     Lightweight serializer for AuditLog list view
     """
     booking_id = serializers.IntegerField(source='booking.id', read_only=True)
+    user_id = serializers.IntegerField(source='booking.user.id', read_only=True)
     user_username = serializers.CharField(source='booking.user.username', read_only=True)
     vehicle_type = serializers.CharField(source='booking.vehicle.vehicle_type', read_only=True)
     vehicle_plate = serializers.CharField(source='booking.vehicle.number_plate', read_only=True)
     slot_number = serializers.CharField(source='booking.slot.slot_number', read_only=True)
-    parking_lot = serializers.CharField(source='booking.slot.parking_lot.name', read_only=True)
+    parking_zone = serializers.SerializerMethodField()
     action_display = serializers.CharField(source='get_action_display', read_only=True)
     status = serializers.SerializerMethodField()
+    checkin_time = serializers.SerializerMethodField()
+    checkout_time = serializers.SerializerMethodField()
     
     class Meta:
         model = AuditLog
         fields = [
-            'id', 'booking_id', 'action', 'action_display', 'timestamp',
+            'id', 'booking_id', 'user_id', 'action', 'action_display', 'timestamp',
             'user_username', 'vehicle_type', 'vehicle_plate',
-            'parking_lot', 'slot_number', 'ip_address', 'status'
+            'parking_zone', 'slot_number', 'ip_address', 'status',
+            'checkin_time', 'checkout_time'
         ]
+    
+    def get_parking_zone(self, obj):
+        """Get the parking zone name"""
+        if obj.booking and obj.booking.slot and obj.booking.slot.parking_zone:
+            return obj.booking.slot.get_parking_zone_display()
+        return 'Unknown'
     
     def get_status(self, obj):
         return 'Success' if obj.success else 'Failed'
+    
+    def get_checkin_time(self, obj):
+        """Return the check-in time from the booking"""
+        if obj.booking and obj.booking.checked_in_at:
+            return obj.booking.checked_in_at
+        return None
+    
+    def get_checkout_time(self, obj):
+        """Return the check-out time from the booking"""
+        if obj.booking and obj.booking.checked_out_at:
+            return obj.booking.checked_out_at
+        return None
 
 
 class AuditLogStatsSerializer(serializers.Serializer):
@@ -542,7 +588,7 @@ class CurrentlyParkedVehicleSerializer(serializers.ModelSerializer):
                 'slot_number': obj.slot.slot_number,
                 'floor': obj.slot.floor,
                 'section': obj.slot.section,
-                'parking_lot': obj.slot.parking_lot.name if obj.slot.parking_lot else None
+                'parking_zone': obj.slot.get_parking_zone_display() if obj.slot.parking_zone else 'Unknown'
             }
         return None
     
@@ -756,8 +802,9 @@ class ParkingSessionListSerializer(serializers.ModelSerializer):
         return obj.vehicle.vehicle_type if obj.vehicle else 'N/A'
     
     def get_location_name(self, obj):
-        if obj.slot and obj.slot.parking_lot:
-            return obj.slot.parking_lot.name
+        """Get the parking zone name"""
+        if obj.slot and obj.slot.parking_zone:
+            return obj.slot.get_parking_zone_display()
         return 'Unknown'
     
     def get_check_in_time(self, obj):
@@ -811,3 +858,276 @@ class UserParkingStatsSerializer(serializers.Serializer):
     this_month = serializers.DictField()
     active_sessions = serializers.IntegerField()
     completed_sessions = serializers.IntegerField()
+
+
+# ============================================================================
+# PRICING RATE SERIALIZERS - For managing parking rates
+# ============================================================================
+
+class PricingRateSerializer(serializers.ModelSerializer):
+    """
+    Full serializer for PricingRate with all details.
+    Used for detailed view and display.
+    """
+    vehicle_type_display = serializers.CharField(source='get_vehicle_type_display', read_only=True)
+    is_valid = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PricingRate
+        fields = [
+            'id', 'rate_name', 'description', 'vehicle_type', 'vehicle_type_display',
+            'hourly_rate', 'daily_rate', 'weekend_rate', 'holiday_rate',
+            'time_slot_start', 'time_slot_end', 'special_rate',
+            'extension_rate_multiplier', 'is_active', 'is_default',
+            'effective_from', 'effective_to', 'is_valid',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'vehicle_type_display', 'is_valid']
+    
+    def get_is_valid(self, obj):
+        """Check if rate is currently valid"""
+        return obj.is_valid_now()
+
+
+class PricingRateListSerializer(serializers.ModelSerializer):
+    """
+    Simplified serializer for listing rates.
+    Shows only essential information for table/list views.
+    """
+    vehicle_type_display = serializers.CharField(source='get_vehicle_type_display', read_only=True)
+    is_valid = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PricingRate
+        fields = [
+            'id', 'rate_name', 'vehicle_type', 'vehicle_type_display',
+            'hourly_rate', 'daily_rate', 'is_active', 'is_default', 'is_valid'
+        ]
+        read_only_fields = ['id', 'vehicle_type_display', 'is_valid']
+    
+    def get_is_valid(self, obj):
+        """Check if rate is currently valid"""
+        return obj.is_valid_now()
+
+
+class PricingRateCreateUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating and updating rates.
+    Includes comprehensive validation.
+    """
+    
+    class Meta:
+        model = PricingRate
+        fields = [
+            'rate_name', 'description', 'vehicle_type',
+            'hourly_rate', 'daily_rate', 'weekend_rate', 'holiday_rate',
+            'time_slot_start', 'time_slot_end', 'special_rate',
+            'extension_rate_multiplier', 'is_active', 'is_default',
+            'effective_from', 'effective_to'
+        ]
+    
+    def validate_hourly_rate(self, value):
+        """Validate hourly rate is positive"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Hourly rate must be greater than 0")
+        return value
+    
+    def validate_daily_rate(self, value):
+        """Validate daily rate is positive if provided"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Daily rate must be greater than 0")
+        return value
+    
+    def validate_weekend_rate(self, value):
+        """Validate weekend rate is positive if provided"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Weekend rate must be greater than 0")
+        return value
+    
+    def validate_holiday_rate(self, value):
+        """Validate holiday rate is positive if provided"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Holiday rate must be greater than 0")
+        return value
+    
+    def validate_special_rate(self, value):
+        """Validate special rate is positive if provided"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Special rate must be greater than 0")
+        return value
+    
+    def validate_extension_rate_multiplier(self, value):
+        """Validate extension rate multiplier is positive"""
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Extension rate multiplier must be greater than 0")
+        return value
+    
+    def validate(self, data):
+        """
+        Comprehensive validation for the rate data.
+        """
+        # Ensure at least one rate type is provided
+        has_hourly = data.get('hourly_rate') is not None and data.get('hourly_rate') != ''
+        has_daily = data.get('daily_rate') is not None and data.get('daily_rate') != ''
+        
+        if not has_hourly and not has_daily:
+            raise serializers.ValidationError({
+                'rate_type': 'At least one rate type (hourly or daily) must be provided'
+            })
+        
+        # Validate effective date range
+        if data.get('effective_from') and data.get('effective_to'):
+            if data['effective_from'] >= data['effective_to']:
+                raise serializers.ValidationError({
+                    'effective_to': 'Effective end date must be after start date'
+                })
+        
+        # Validate time slot
+        if data.get('time_slot_start') or data.get('time_slot_end') or data.get('special_rate'):
+            if not (data.get('time_slot_start') and data.get('time_slot_end') and data.get('special_rate')):
+                raise serializers.ValidationError({
+                    'time_slot': 'Time slot start, end, and special rate must all be provided together'
+                })
+        
+        # Check for overlapping rates (only for active rates with same vehicle type and defined date ranges)
+        if data.get('is_active', True):
+            vehicle_type = data.get('vehicle_type')
+            effective_from = data.get('effective_from')
+            effective_to = data.get('effective_to')
+            
+            # Only check for overlaps if date range is specified
+            # If no dates are specified, allow multiple active rates (admin can manage them)
+            if effective_from or effective_to:
+                # Build query to find overlapping rates
+                overlapping_query = PricingRate.objects.filter(
+                    vehicle_type=vehicle_type,
+                    is_active=True
+                )
+                
+                # Exclude current instance if updating
+                if self.instance:
+                    overlapping_query = overlapping_query.exclude(pk=self.instance.pk)
+                
+                # Check for date overlap
+                if effective_from and effective_to:
+                    overlapping_query = overlapping_query.filter(
+                        effective_from__lte=effective_to,
+                        effective_to__gte=effective_from
+                    )
+                elif effective_from:
+                    overlapping_query = overlapping_query.filter(
+                        effective_to__isnull=True
+                    ) | overlapping_query.filter(
+                        effective_to__gte=effective_from
+                    )
+                elif effective_to:
+                    overlapping_query = overlapping_query.filter(
+                        effective_from__isnull=True
+                    ) | overlapping_query.filter(
+                        effective_from__lte=effective_to
+                    )
+                
+                if overlapping_query.exists():
+                    raise serializers.ValidationError({
+                        'effective_dates': f'Another active rate for {vehicle_type} already exists in this time period'
+                    })
+        
+        return data
+
+
+class FeeCalculationSerializer(serializers.Serializer):
+    """
+    Serializer for fee calculation requests.
+    """
+    vehicle_type = serializers.ChoiceField(choices=PricingRate.VEHICLE_TYPE_CHOICES)
+    hours = serializers.DecimalField(max_digits=5, decimal_places=2, default=0, min_value=0)
+    days = serializers.IntegerField(default=0, min_value=0)
+    booking_datetime = serializers.DateTimeField(required=False, allow_null=True)
+    
+    def validate(self, data):
+        """Ensure at least hours or days is provided"""
+        if data.get('hours', 0) == 0 and data.get('days', 0) == 0:
+            raise serializers.ValidationError('Either hours or days must be greater than 0')
+        return data
+
+
+class FeeCalculationResponseSerializer(serializers.Serializer):
+    """
+    Serializer for fee calculation response.
+    """
+    vehicle_type = serializers.CharField()
+    rate_name = serializers.CharField()
+    hourly_rate = serializers.DecimalField(max_digits=6, decimal_places=2)
+    daily_rate = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
+    applicable_rate = serializers.DecimalField(max_digits=6, decimal_places=2)
+    hours = serializers.DecimalField(max_digits=5, decimal_places=2)
+    days = serializers.IntegerField()
+    total_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+    breakdown = serializers.DictField()
+    is_weekend = serializers.BooleanField()
+    is_special_time = serializers.BooleanField()
+
+
+class ZonePricingRateSerializer(serializers.ModelSerializer):
+    """Serializer for zone pricing rates"""
+    parking_zone_display = serializers.CharField(source='get_parking_zone_display', read_only=True)
+    vehicle_type_display = serializers.CharField(source='get_vehicle_type_display', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    is_valid = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ZonePricingRate
+        fields = [
+            'id', 'parking_zone', 'parking_zone_display',
+            'vehicle_type', 'vehicle_type_display',
+            'rate_name', 'description',
+            'hourly_rate', 'daily_rate', 'weekend_rate',
+            'is_active', 'effective_from', 'effective_to',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at', 'is_valid'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'created_by']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.get_full_name() or obj.created_by.username
+        return None
+    
+    def get_is_valid(self, obj):
+        return obj.is_valid_now()
+    
+    def validate(self, data):
+        """Validate that only one active rate exists per zone-vehicle combination"""
+        parking_zone = data.get('parking_zone')
+        vehicle_type = data.get('vehicle_type')
+        is_active = data.get('is_active', True)
+        
+        if is_active:
+            # Check if another active rate exists for same zone-vehicle combo
+            existing = ZonePricingRate.objects.filter(
+                parking_zone=parking_zone,
+                vehicle_type=vehicle_type,
+                is_active=True
+            )
+            
+            # Exclude current instance when updating
+            if self.instance:
+                existing = existing.exclude(pk=self.instance.pk)
+            
+            if existing.exists():
+                raise serializers.ValidationError(
+                    f"An active rate already exists for {parking_zone} - {vehicle_type}. "
+                    "Please deactivate the existing rate first."
+                )
+        
+        return data
+
+
+class ZonePricingRateBulkUpdateSerializer(serializers.Serializer):
+    """Serializer for bulk updating zone pricing rates"""
+    rates = ZonePricingRateSerializer(many=True)
+    
+    def validate_rates(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one rate must be provided")
+        return value

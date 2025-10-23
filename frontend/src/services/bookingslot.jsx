@@ -1,12 +1,12 @@
 import http from './httpClient';
 
-export async function createBooking({ slot, vehicle, start_time, end_time, date, time, duration }) {
+export async function createBooking({ slot, slot_id, vehicle, start_time, end_time, date, time, duration }) {
   console.log('Creating booking with parameters:', {
-    slot, vehicle, start_time, end_time, date, time, duration
+    slot, slot_id, vehicle, start_time, end_time, date, time, duration
   });
   
   const bookingData = { 
-    slot,
+    slot_id: slot_id || slot,  // Use slot_id if provided, fallback to slot for backward compatibility
     vehicle
   };
   
