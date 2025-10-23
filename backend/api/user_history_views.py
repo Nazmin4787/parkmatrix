@@ -18,6 +18,7 @@ import csv
 from django.http import HttpResponse
 
 from .models import Booking, User, AuditLog
+from .permissions import IsAdminUser
 from .serializers import (
     ParkingSessionSerializer,
     ParkingSessionListSerializer,
@@ -644,7 +645,7 @@ def admin_user_stats(request, user_id):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminUser])
 def admin_users_list(request):
     """
     Get list of all users for admin dropdown selection
@@ -653,13 +654,6 @@ def admin_users_list(request):
     Returns user id, username, email, and role for display in admin interface.
     """
     try:
-        # Verify user is admin
-        if not request.user.is_staff:
-            return Response(
-                {'error': 'Admin access required'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         # Get all users, ordered by username
         users = User.objects.all().order_by('username')
         

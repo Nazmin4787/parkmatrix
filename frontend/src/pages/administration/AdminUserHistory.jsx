@@ -45,7 +45,7 @@ const AdminUserHistory = () => {
       const token = localStorage.getItem('accessToken');
       console.log('Fetching users with token:', token ? 'Token exists' : 'No token');
       
-      const response = await fetch('http://127.0.0.1:8000/api/admin/users/', {
+      const response = await fetch('http://localhost:8000/api/admin/users/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -78,10 +78,13 @@ const AdminUserHistory = () => {
           setUsers([]);
         }
       } else {
-        console.error('Failed to fetch users:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch users:', response.status, response.statusText, errorData);
+        setError(`Failed to load users: ${errorData.error || response.statusText}`);
       }
     } catch (err) {
       console.error('Error fetching users:', err);
+      setError(`Error loading users: ${err.message}`);
     }
   };
 
@@ -272,6 +275,15 @@ const AdminUserHistory = () => {
         </div>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <div className="alert alert-error">
+          <span>⚠️</span>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="alert-close">×</button>
+        </div>
+      )}
+
       {/* User Selection */}
       <div className="user-selection-section">
         <div className="user-select-group">
@@ -281,15 +293,23 @@ const AdminUserHistory = () => {
             value={selectedUserId}
             onChange={handleUserSelect}
             className="user-select"
+            disabled={users.length === 0}
           >
-            <option value="">-- Select a user --</option>
+            <option value="">
+              {users.length === 0 ? '-- Loading users... --' : '-- Select a user --'}
+            </option>
             {console.log('Rendering dropdown with', users.length, 'users')}
             {users.map(user => (
               <option key={user.id} value={user.id}>
-                {user.username} ({user.email}) - {user.role}
+                {user.full_name || user.username} ({user.email}) - {user.role}
               </option>
             ))}
           </select>
+          {users.length === 0 && (
+            <small style={{ color: '#999', display: 'block', marginTop: '0.5rem' }}>
+              Loading user list...
+            </small>
+          )}
         </div>
 
         {selectedUserInfo && (

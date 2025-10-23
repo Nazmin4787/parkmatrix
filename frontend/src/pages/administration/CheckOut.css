@@ -40,10 +40,10 @@
 }
 
 .booking-quick-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
   border-radius: 12px;
   padding: 1.5rem;
-  color: white;
+  color: #333;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -66,25 +66,28 @@
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .booking-quick-card .booking-id {
   font-weight: bold;
   font-size: 1.1rem;
+  color: #667eea;
 }
 
 .booking-quick-card .status-badge {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(102, 126, 234, 0.15);
+  color: #667eea;
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-size: 0.85rem;
-  backdrop-filter: blur(10px);
+  border: 1px solid rgba(102, 126, 234, 0.3);
 }
 
 .booking-quick-card .status-badge.requested {
-  background: rgba(255, 193, 7, 0.3);
-  border: 1px solid rgba(255, 193, 7, 0.5);
+  background: rgba(255, 193, 7, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(255, 193, 7, 0.3);
 }
 
 .booking-quick-card .card-body {
@@ -100,18 +103,20 @@
 }
 
 .booking-quick-card .info-row .label {
-  opacity: 0.9;
+  color: #666;
 }
 
 .booking-quick-card .info-row .value {
   font-weight: 600;
+  color: #333;
 }
 
 .booking-quick-card .info-row.highlight {
-  background: rgba(255, 193, 7, 0.2);
+  background: rgba(255, 193, 7, 0.15);
   padding: 0.5rem;
   border-radius: 6px;
   margin-top: 0.5rem;
+  border: 1px solid rgba(255, 193, 7, 0.3);
 }
 
 .booking-quick-card .card-footer {
@@ -120,8 +125,8 @@
 
 .quick-select-btn {
   width: 100%;
-  background: white;
-  color: #667eea;
+  background: #667eea;
+  color: white;
   border: none;
   padding: 0.75rem;
   border-radius: 8px;
@@ -132,7 +137,7 @@
 }
 
 .quick-select-btn:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: #5568d3;
   transform: scale(1.02);
 }
 

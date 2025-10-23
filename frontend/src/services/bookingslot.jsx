@@ -12,18 +12,32 @@ export async function createBooking({ slot, slot_id, vehicle, start_time, end_ti
   
   // Add datetime fields if provided - use start_time/end_time if available (preferred)
   if (start_time) {
-    // Ensure date is properly formatted for API
+    // Format date in local timezone instead of ISO to avoid timezone conversion issues
     if (start_time instanceof Date) {
-      bookingData.start_time = start_time.toISOString();
+      // Format as YYYY-MM-DD HH:MM:SS in local timezone
+      const year = start_time.getFullYear();
+      const month = String(start_time.getMonth() + 1).padStart(2, '0');
+      const day = String(start_time.getDate()).padStart(2, '0');
+      const hours = String(start_time.getHours()).padStart(2, '0');
+      const minutes = String(start_time.getMinutes()).padStart(2, '0');
+      const seconds = String(start_time.getSeconds()).padStart(2, '0');
+      bookingData.start_time = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     } else {
       bookingData.start_time = start_time;
     }
   }
   
   if (end_time) {
-    // Ensure date is properly formatted for API
+    // Format date in local timezone instead of ISO to avoid timezone conversion issues
     if (end_time instanceof Date) {
-      bookingData.end_time = end_time.toISOString();
+      // Format as YYYY-MM-DD HH:MM:SS in local timezone
+      const year = end_time.getFullYear();
+      const month = String(end_time.getMonth() + 1).padStart(2, '0');
+      const day = String(end_time.getDate()).padStart(2, '0');
+      const hours = String(end_time.getHours()).padStart(2, '0');
+      const minutes = String(end_time.getMinutes()).padStart(2, '0');
+      const seconds = String(end_time.getSeconds()).padStart(2, '0');
+      bookingData.end_time = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     } else {
       bookingData.end_time = end_time;
     }

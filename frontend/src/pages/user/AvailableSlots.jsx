@@ -897,6 +897,7 @@ export default function AvailableSlots() {
                     <option value="suv">SUV</option>
                     <option value="truck">Truck</option>
                     <option value="motorcycle">Motorcycle</option>
+                    <option value="bike">Bike</option>
                     <option value="van">Van</option>
                   </select>
                 </div>

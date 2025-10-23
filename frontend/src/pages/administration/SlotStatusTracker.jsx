@@ -85,11 +85,13 @@ const SlotStatusTracker = () => {
       const bookingMap = {};
       if (activeBookings && Array.isArray(activeBookings)) {
         activeBookings.forEach(booking => {
-          if (booking && booking.slot_number) {
-            bookingMap[booking.slot_number] = booking;
+          if (booking && booking.slot && booking.slot.slot_number) {
+            bookingMap[booking.slot.slot_number] = booking;
           }
         });
       }
+      
+      console.log("Booking map:", bookingMap);
       
       // Apply filters to slots
       let filteredSlots = [...allSlots];
@@ -106,8 +108,8 @@ const SlotStatusTracker = () => {
         filteredSlots = filteredSlots.filter(slot => {
           // Check if this slot has an active booking
           const booking = bookingMap[slot.slot_number];
-          if (slot.is_occupied && booking) {
-            return booking.vehicle_type === filterVehicleType;
+          if (slot.is_occupied && booking && booking.vehicle) {
+            return booking.vehicle.vehicle_type === filterVehicleType;
           }
           // Otherwise check the slot's designated vehicle type
           return slot.vehicle_type === filterVehicleType;
@@ -124,15 +126,16 @@ const SlotStatusTracker = () => {
           id: slot.id,
           slotId: slot.slot_number,
           status: isOccupied ? 'Occupied' : 'Free',
-          vehicleNo: (isOccupied && booking && booking.vehicle_no) ? booking.vehicle_no : '',
-          vehicleType: (booking && booking.vehicle_type) ? booking.vehicle_type : slot.vehicle_type || 'any',
+          vehicleNo: (isOccupied && booking && booking.vehicle && booking.vehicle.number_plate) ? booking.vehicle.number_plate : '',
+          vehicleType: (booking && booking.vehicle && booking.vehicle.vehicle_type) ? booking.vehicle.vehicle_type : slot.vehicle_type || 'any',
           userId: (isOccupied && booking && booking.user_id) ? booking.user_id : '',
-          checkIn: (isOccupied && booking && booking.check_in_time) ? booking.check_in_time : '',
-          checkOut: (isOccupied && booking) ? (booking.checked_out_at || '') : '',
+          checkIn: (isOccupied && booking && booking.checked_in_at) ? booking.checked_in_at : '',
+          checkOut: (isOccupied && booking && booking.checked_out_at) ? booking.checked_out_at : '',
           parkingZone: slot.parking_zone_display || 'Unknown'
         };
       });
 
+      console.log("Transformed slots:", transformedSlots);
       setSlotDetails(transformedSlots);
     } catch (err) {
       console.error('Error fetching slot details:', err);

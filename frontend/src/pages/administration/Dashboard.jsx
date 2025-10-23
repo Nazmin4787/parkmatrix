@@ -110,14 +110,6 @@ export default function AdminDashboard() {
             </div>
           </Link>
 
-          <Link className="action-card action-secondary" to="/admin/rates">
-            <div className="action-icon">💰</div>
-            <div className="action-content">
-              <div className="action-title">Manage Rates</div>
-              <div className="action-desc">Configure parking rates</div>
-            </div>
-          </Link>
-
           <Link className="action-card action-secondary" to="/admin/zone-pricing">
             <div className="action-icon">🏷️</div>
             <div className="action-content">
