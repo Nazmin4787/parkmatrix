@@ -197,6 +197,16 @@ class Booking(models.Model):
     actual_duration_minutes = models.IntegerField(null=True, blank=True)
     overtime_minutes = models.IntegerField(default=0)
     overtime_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    
+    # Overstay payment tracking
+    overstay_amount = models.DecimalField(max_digits=8, decimal_places=2, default=0.00, 
+                                         help_text="Calculated overstay fee amount")
+    overstay_paid = models.BooleanField(default=False, 
+                                       help_text="Whether overstay fee has been paid")
+    overstay_paid_at = models.DateTimeField(null=True, blank=True, 
+                                           help_text="Timestamp when overstay fee was paid")
+    overstay_payment_method = models.CharField(max_length=20, null=True, blank=True,
+                                              help_text="Payment method used for overstay (card, cash, etc)")
 
     def save(self, *args, **kwargs):
         if not self.initial_end_time:
@@ -294,6 +304,42 @@ class Booking(models.Model):
         
         return True, ""
     
+    def calculate_overstay_fee(self, current_time=None):
+        """
+        Calculate potential overstay fee at current time (before checkout).
+        Used to display overstay charges to admin before checkout verification.
+        Returns: dict with overstay_minutes and overstay_amount
+        """
+        if current_time is None:
+            current_time = timezone.now()
+        
+        overstay_data = {
+            'has_overstay': False,
+            'overstay_minutes': 0,
+            'overstay_amount': 0.00,
+            'overstay_hours': 0.0
+        }
+        
+        # Check if current time exceeds booking end time
+        if current_time > self.end_time:
+            overstay = current_time - self.end_time
+            overstay_minutes = int(overstay.total_seconds() / 60)
+            
+            # Calculate overstay charge
+            if overstay_minutes > 0 and self.slot.parking_lot:
+                overstay_hours = overstay_minutes / 60
+                hourly_rate = self.slot.parking_lot.hourly_rate or 0
+                overstay_amount = round(overstay_hours * float(hourly_rate), 2)
+                
+                overstay_data = {
+                    'has_overstay': True,
+                    'overstay_minutes': overstay_minutes,
+                    'overstay_amount': overstay_amount,
+                    'overstay_hours': round(overstay_hours, 2)
+                }
+        
+        return overstay_data
+    
     def calculate_overtime(self):
         """
         Calculate overtime charges if check-out is after end_time.
@@ -337,6 +383,8 @@ class AuditLog(models.Model):
         ('check_out_attempt', 'Check-out Attempt'),
         ('check_out_success', 'Check-out Success'),
         ('check_out_failed', 'Check-out Failed'),
+        ('long_stay_detected', 'Long-Stay Detected'),
+        ('long_stay_warning', 'Long-Stay Warning'),
     ]
     
     booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='audit_logs')

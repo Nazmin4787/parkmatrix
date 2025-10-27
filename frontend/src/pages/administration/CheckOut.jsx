@@ -12,6 +12,8 @@ export default function CheckOut() {
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [secretCode, setSecretCode] = useState('');
   const [paymentSummary, setPaymentSummary] = useState(null);
+  const [overstayInfo, setOverstayInfo] = useState(null);
+  const [showOverstayWarning, setShowOverstayWarning] = useState(false);
   
   // NEW: State for displaying checked-in bookings
   const [checkedInBookings, setCheckedInBookings] = useState([]);
@@ -98,6 +100,8 @@ export default function CheckOut() {
     setLoading(true);
     setError('');
     setSuccess('');
+    setOverstayInfo(null);
+    setShowOverstayWarning(false);
 
     try {
       const token = localStorage.getItem('accessToken');
@@ -108,6 +112,42 @@ export default function CheckOut() {
         return;
       }
 
+      // First, check for overstay fee
+      try {
+        const overstayResponse = await axios.get(
+          `http://localhost:8000/api/admin/checkout/overstay/?vehicle_plate=${vehiclePlate}`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+
+        const overstayData = overstayResponse.data.overstay_info;
+        
+        if (overstayData.has_overstay) {
+          setOverstayInfo(overstayData);
+          setShowOverstayWarning(true);
+          setLoading(false);
+          
+          // Ask admin to confirm
+          const confirmCheckout = window.confirm(
+            `⚠️ OVERSTAY DETECTED!\n\n` +
+            `Vehicle: ${vehiclePlate}\n` +
+            `Overstay Time: ${overstayData.overstay_hours} hours (${overstayData.overstay_minutes} minutes)\n` +
+            `Additional Fee: ₹${overstayData.overstay_amount.toFixed(2)}\n\n` +
+            `Do you want to proceed with checkout verification?`
+          );
+          
+          if (!confirmCheckout) {
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (overstayErr) {
+        console.log('Could not fetch overstay info:', overstayErr);
+        // Continue with checkout even if overstay check fails
+      }
+
+      // Proceed with checkout verification
       const response = await axios.post(
         'http://localhost:8000/api/admin/checkout/',
         {
@@ -120,7 +160,22 @@ export default function CheckOut() {
       );
 
       setPaymentSummary(response.data.payment_summary);
-      setSuccess('Check-out successful!');
+      
+      // Check if overstay info is in response
+      if (response.data.overstay_info) {
+        setOverstayInfo(response.data.overstay_info);
+      }
+      
+      let successMessage = '✅ Check-out verified successfully!';
+      if (response.data.overstay_warning) {
+        successMessage += '\n\n' + response.data.overstay_warning;
+      }
+      
+      setSuccess(successMessage);
+      
+      // Refresh bookings list
+      fetchCheckedInBookings();
+      
     } catch (err) {
       if (err.response?.status === 401) {
         setError('Session expired. Please sign in again.');
@@ -233,6 +288,25 @@ export default function CheckOut() {
         {success && !paymentSummary && (
           <div className="alert alert-success">
             ✓ {success}
+          </div>
+        )}
+
+        {overstayInfo && overstayInfo.has_overstay && (
+          <div className="alert alert-warning overstay-alert">
+            <h3>⚠️ Overstay Fee Detected</h3>
+            <div className="overstay-details">
+              <div className="overstay-row">
+                <span className="label">Overstay Duration:</span>
+                <span className="value">{overstayInfo.overstay_hours} hours ({overstayInfo.overstay_minutes} minutes)</span>
+              </div>
+              <div className="overstay-row highlight">
+                <span className="label">Additional Fee:</span>
+                <span className="value fee">₹{overstayInfo.overstay_amount.toFixed(2)}</span>
+              </div>
+            </div>
+            <p className="overstay-note">
+              💡 This amount will be added to the customer's total bill.
+            </p>
           </div>
         )}
 

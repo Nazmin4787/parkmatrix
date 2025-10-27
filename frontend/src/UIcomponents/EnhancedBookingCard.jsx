@@ -14,6 +14,8 @@ export default function EnhancedBookingCard({
 }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  const [overstayPaid, setOverstayPaid] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const showToast = (message, type = 'info') => {
     setToast({ show: true, message, type });
@@ -87,7 +89,43 @@ export default function EnhancedBookingCard({
     }
   };
 
+  const handlePayOverstay = async () => {
+    try {
+      setPaymentLoading(true);
+      showToast('Processing overstay payment...', 'info');
+      
+      // Simulate payment processing (you can integrate real payment gateway here)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      setOverstayPaid(true);
+      showToast('✅ Overstay fee paid successfully! You can now proceed with checkout.', 'success');
+      
+      // Optional: You can make an API call here to record the payment
+      // const token = localStorage.getItem('accessToken');
+      // await fetch('http://localhost:8000/api/bookings/pay-overstay/', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //     'Content-Type': 'application/json'
+      //   },
+      //   body: JSON.stringify({ booking_id: booking.id })
+      // });
+      
+    } catch (error) {
+      showToast('❌ Payment failed. Please try again.', 'error');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const handleCheckOut = async () => {
+    // Check if overstay exists and is not paid (only for checkout_verified status)
+    const overstayInfo = calculateOverstay();
+    if (booking.status === 'checkout_verified' && overstayInfo && overstayInfo.has_overstay && !overstayPaid) {
+      showToast('⚠️ Payment Required: Please pay the overstay fee of $' + overstayInfo.overstay_amount.toFixed(2) + ' to complete checkout successfully.', 'error');
+      return;
+    }
+    
     try {
       setActionLoading(true);
       
@@ -217,12 +255,48 @@ export default function EnhancedBookingCard({
     return status === 'checkout_verified';
   };
 
+  const calculateOverstay = () => {
+    if (!booking || !booking.end_time) return null;
+    
+    const status = booking.status || (booking.is_active ? 'confirmed' : 'completed');
+    
+    // Calculate overstay for checked-in, checkout_requested, and checkout_verified statuses
+    if (status !== 'checked_in' && status !== 'checkout_requested' && status !== 'checkout_verified') {
+      return null;
+    }
+    
+    const endTime = new Date(booking.end_time);
+    const now = new Date();
+    
+    // Check if current time exceeds booking end time
+    if (now > endTime) {
+      const overstayMs = now - endTime;
+      const overstayMinutes = Math.floor(overstayMs / (1000 * 60));
+      const overstayHours = (overstayMinutes / 60).toFixed(2);
+      
+      // Calculate overstay amount (assuming hourly rate from slot's parking lot)
+      // For now, use a default rate if not available
+      const hourlyRate = booking.slot?.parking_lot?.hourly_rate || 10;
+      const overstayAmount = (overstayMinutes / 60) * hourlyRate;
+      
+      return {
+        has_overstay: true,
+        overstay_minutes: overstayMinutes,
+        overstay_hours: parseFloat(overstayHours),
+        overstay_amount: overstayAmount
+      };
+    }
+    
+    return null;
+  };
+
   const formatDateTime = (dateTimeString) => {
     if (!dateTimeString) return 'N/A';
     return new Date(dateTimeString).toLocaleString();
   };
 
   const statusInfo = getStatusInfo();
+  const overstayInfo = calculateOverstay();
 
   return (
     <div className="booking-card enhanced">
@@ -267,58 +341,139 @@ export default function EnhancedBookingCard({
               {booking.vehicle?.number_plate || 'N/A'}
             </span>
           </div>
-          
-          <div className="detail-item">
-            <span className="detail-label">Start Time</span>
-            <span className="detail-value">
-              {formatDateTime(booking.start_time)}
-            </span>
-          </div>
-          
-          <div className="detail-item">
-            <span className="detail-label">End Time</span>
-            <span className="detail-value">
-              {formatDateTime(booking.end_time)}
-            </span>
-          </div>
 
-          {booking.checked_in_at && (
-            <div className="detail-item">
-              <span className="detail-label">Checked In</span>
-              <span className="detail-value">
-                {formatDateTime(booking.checked_in_at)}
+          {/* Overstay Fee Display */}
+          {overstayInfo && overstayInfo.has_overstay && (
+            <div className="detail-item" style={{ 
+              background: overstayPaid 
+                ? 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)' 
+                : 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+              padding: '0.75rem',
+              borderRadius: '8px',
+              border: overstayPaid ? '2px solid #10B981' : '2px solid #F59E0B',
+              gridColumn: '1 / -1'
+            }}>
+              <span className="detail-label" style={{ color: overstayPaid ? '#065F46' : '#92400E' }}>
+                Overstay Fee {overstayPaid 
+                  ? <span style={{ fontWeight: 'bold', color: '#10B981' }}>✅ (Paid)</span>
+                  : <span style={{ fontWeight: 'bold', color: '#F59E0B' }}>(Pending)</span>
+                }
               </span>
-            </div>
-          )}
-
-          {booking.checked_out_at && (
-            <div className="detail-item">
-              <span className="detail-label">Checked Out</span>
-              <span className="detail-value">
-                {formatDateTime(booking.checked_out_at)}
-              </span>
-            </div>
-          )}
-
-          {booking.overtime_minutes > 0 && (
-            <div className="detail-item">
-              <span className="detail-label">Overtime</span>
-              <span className="detail-value text-red-600">
-                {booking.overtime_minutes}m (+${booking.overtime_amount})
-              </span>
-            </div>
-          )}
-
-          {booking.total_price && (
-            <div className="detail-item">
-              <span className="detail-label">Amount</span>
-              <span className="detail-value font-semibold">
-                ${booking.total_price}
+              <span className="detail-value font-semibold" style={{ 
+                color: overstayPaid ? '#10B981' : '#DC2626', 
+                fontSize: '1.1rem',
+                textDecoration: overstayPaid ? 'line-through' : 'none'
+              }}>
+                ${overstayInfo.overstay_amount.toFixed(2)}
               </span>
             </div>
           )}
         </div>
       </div>
+      
+      {/* Overstay Warning Banner - Checked In (before checkout verification) */}
+      {overstayInfo && overstayInfo.has_overstay && booking.status === 'checked_in' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+          padding: '1rem',
+          margin: '1rem',
+          borderRadius: '8px',
+          border: '2px solid #F59E0B',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 'bold', color: '#92400E', marginBottom: '0.25rem' }}>
+              Overstay Detected
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#78350F' }}>
+              You have exceeded your booking time by <strong>{overstayInfo.overstay_hours} hours</strong> ({overstayInfo.overstay_minutes} minutes). 
+              Please request checkout to proceed.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Overstay Warning Banner with Pay Button - After Checkout Verification */}
+      {overstayInfo && overstayInfo.has_overstay && !overstayPaid && booking.status === 'checkout_verified' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+          padding: '1rem',
+          margin: '1rem',
+          borderRadius: '8px',
+          border: '2px solid #F59E0B'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 'bold', color: '#92400E', marginBottom: '0.25rem' }}>
+                Overstay Detected - Payment Required
+              </div>
+              <div style={{ fontSize: '0.9rem', color: '#78350F' }}>
+                You have exceeded your booking time by <strong>{overstayInfo.overstay_hours} hours</strong> ({overstayInfo.overstay_minutes} minutes). 
+                Please pay the overstay fee to complete checkout.
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={handlePayOverstay}
+            disabled={paymentLoading}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              cursor: paymentLoading ? 'not-allowed' : 'pointer',
+              opacity: paymentLoading ? 0.7 : 1,
+              transition: 'all 0.3s ease',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+            onMouseEnter={(e) => {
+              if (!paymentLoading) {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            }}
+          >
+            {paymentLoading ? '⏳ Processing Payment...' : `💳 Pay Overstay Fee ($${overstayInfo.overstay_amount.toFixed(2)})`}
+          </button>
+        </div>
+      )}
+
+      {/* Payment Success Banner */}
+      {overstayInfo && overstayInfo.has_overstay && overstayPaid && booking.status === 'checkout_verified' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
+          padding: '1rem',
+          margin: '1rem',
+          borderRadius: '8px',
+          border: '2px solid #10B981',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <span style={{ fontSize: '1.5rem' }}>✅</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 'bold', color: '#065F46', marginBottom: '0.25rem' }}>
+              Overstay Payment Completed
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#047857' }}>
+              Your overstay fee of <strong>${overstayInfo.overstay_amount.toFixed(2)}</strong> has been paid successfully. 
+              You can now proceed with checkout.
+            </div>
+          </div>
+        </div>
+      )}
       
       {showActions && (
         <div className="booking-actions">
@@ -334,13 +489,37 @@ export default function EnhancedBookingCard({
           )}
           
           {canCheckOut() && (
-            <button 
-              className="btn-checkout"
-              onClick={handleCheckOut}
-              disabled={actionLoading}
-            >
-              {actionLoading ? 'Completing Checkout...' : '✅ Confirm Checkout'}
-            </button>
+            <>
+              <button 
+                className="btn-checkout"
+                onClick={handleCheckOut}
+                disabled={actionLoading || (overstayInfo && overstayInfo.has_overstay && !overstayPaid)}
+                style={{
+                  opacity: (overstayInfo && overstayInfo.has_overstay && !overstayPaid) ? 0.5 : 1,
+                  cursor: (overstayInfo && overstayInfo.has_overstay && !overstayPaid) ? 'not-allowed' : 'pointer'
+                }}
+                title={overstayInfo && overstayInfo.has_overstay && !overstayPaid ? 'Please pay the overstay fee first' : ''}
+              >
+                {actionLoading ? 'Completing Checkout...' : '✅ Confirm Checkout'}
+              </button>
+              
+              {/* Warning message when payment is pending */}
+              {overstayInfo && overstayInfo.has_overstay && !overstayPaid && (
+                <div style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  background: '#FEE2E2',
+                  border: '1px solid #EF4444',
+                  borderRadius: '6px',
+                  color: '#991B1B',
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  marginTop: '0.5rem'
+                }}>
+                  ⚠️ Pay overstay fee to enable checkout
+                </div>
+              )}
+            </>
           )}
           
           {/* Standard actions */}

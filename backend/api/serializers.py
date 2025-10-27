@@ -124,13 +124,15 @@ class BookingSerializer(serializers.ModelSerializer):
             'initial_end_time', 'extension_count', 'status', 'secret_code',
             'checked_in_at', 'checked_in_by', 'checked_in_ip', 'check_in_notes', 
             'checked_out_at', 'checked_out_by', 'checked_out_ip', 'check_out_notes', 
-            'actual_duration_minutes', 'overtime_minutes', 'overtime_amount'
+            'actual_duration_minutes', 'overtime_minutes', 'overtime_amount',
+            'overstay_amount', 'overstay_paid', 'overstay_paid_at', 'overstay_payment_method'
         ]
         read_only_fields = [
             'user', 'slot', 'parking_zone_display', 'total_price', 'initial_end_time', 
             'extension_count', 'status', 'secret_code', 'checked_in_at', 'checked_in_by', 
             'checked_in_ip', 'checked_out_at', 'checked_out_by', 'checked_out_ip',
-            'actual_duration_minutes', 'overtime_minutes', 'overtime_amount'
+            'actual_duration_minutes', 'overtime_minutes', 'overtime_amount',
+            'overstay_amount', 'overstay_paid', 'overstay_paid_at', 'overstay_payment_method'
         ]
     
     def get_parking_zone_display(self, obj):

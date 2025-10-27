@@ -13,9 +13,9 @@ class ActiveBookingsWithDetailsView(views.APIView):
 
     def get(self, request):
         # Get active bookings with user and vehicle details
-        # Include checked_in and checkout_requested for admin checkout verification
+        # Include all active statuses: confirmed, verified, checked_in, checkout_requested
         active_bookings = Booking.objects.filter(
-            status__in=['confirmed', 'checked_in', 'checkout_requested'],
+            status__in=['confirmed', 'verified', 'checked_in', 'checkout_requested'],
             is_active=True
         ).select_related('user', 'slot', 'vehicle')
         

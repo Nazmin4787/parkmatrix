@@ -392,3 +392,75 @@
     font-size: 0.9rem;
   }
 }
+
+/* Overstay Alert Styles */
+.alert-warning.overstay-alert {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe5b4 100%);
+  color: #856404;
+  border-left: 4px solid #ffc107;
+  padding: 1.5rem;
+  margin: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+
+.overstay-alert h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.overstay-details {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.overstay-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(133, 100, 4, 0.1);
+}
+
+.overstay-row:last-child {
+  border-bottom: none;
+}
+
+.overstay-row.highlight {
+  background: rgba(255, 193, 7, 0.15);
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  border: none;
+}
+
+.overstay-row .label {
+  font-weight: 600;
+  color: #856404;
+}
+
+.overstay-row .value {
+  font-weight: 700;
+  color: #333;
+}
+
+.overstay-row .value.fee {
+  font-size: 1.3rem;
+  color: #dc2626;
+}
+
+.overstay-note {
+  margin: 0;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #856404;
+  border-left: 3px solid #ffc107;
+}

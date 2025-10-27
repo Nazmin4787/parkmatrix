@@ -150,13 +150,17 @@ class LongStayDetectionService:
             booking=booking,
             user=booking.user,
             action='long_stay_detected',
-            details=f"Vehicle {vehicle_info['vehicle']['plate']} has been parked for {vehicle_info['timing']['current_duration_formatted']} (>24h)",
-            ip_address='system',
+            notes=f"Vehicle {vehicle_info['vehicle']['plate']} has been parked for {vehicle_info['timing']['current_duration_formatted']} (>24h)",
+            ip_address=None,
+            user_agent='system/long-stay-detection',
             success=True
         )
         
         # Notify the vehicle owner
         self._notify_user(booking, vehicle_info)
+        
+        # Notify all admins immediately about critical long-stay
+        self._notify_admins_critical(booking, vehicle_info)
         
         logger.warning(f"LONG-STAY ALERT: Booking {booking.id}, Vehicle {vehicle_info['vehicle']['plate']}, Duration: {vehicle_info['timing']['current_duration_formatted']}")
     
@@ -177,71 +181,215 @@ class LongStayDetectionService:
             booking=booking,
             user=booking.user,
             action='long_stay_warning',
-            details=f"Vehicle {vehicle_info['vehicle']['plate']} approaching long-stay threshold: {vehicle_info['timing']['current_duration_formatted']}",
-            ip_address='system',
+            notes=f"Vehicle {vehicle_info['vehicle']['plate']} approaching long-stay threshold: {vehicle_info['timing']['current_duration_formatted']}",
+            ip_address=None,
+            user_agent='system/long-stay-detection',
             success=True
         )
+        
+        # Notify the customer about approaching threshold
+        self._notify_user_warning(booking, vehicle_info)
+        
+        # Notify admins about warning vehicles
+        self._notify_admins_warning(booking, vehicle_info)
         
         logger.info(f"WARNING: Booking {booking.id} approaching long-stay threshold")
     
     def _notify_user(self, booking, vehicle_info):
-        """Send notification to vehicle owner"""
+        """Send critical notification to vehicle owner"""
         Notification.objects.create(
             user=booking.user,
             notification_type='system_alert',
-            title='⚠️ Long-Stay Alert',
-            message=f"Your vehicle ({vehicle_info['vehicle']['plate']}) has been parked for {vehicle_info['timing']['current_duration_formatted']} at {vehicle_info['slot']['parking_lot']}, Slot {vehicle_info['slot']['number']}. Please check out as soon as possible to avoid additional charges.",
+            title='🚨 CRITICAL: Long-Stay Alert',
+            message=f"Your vehicle ({vehicle_info['vehicle']['plate']}) has been parked for {vehicle_info['timing']['current_duration_formatted']} at {vehicle_info['slot']['parking_lot']}, Slot {vehicle_info['slot']['number']}. This exceeds the 24-hour limit. Please check out immediately to avoid additional charges and potential penalties.",
             related_object_id=str(booking.id),
             related_object_type='Booking',
             additional_data={
-                'alert_type': 'long_stay',
+                'alert_type': 'long_stay_critical',
                 'duration_hours': vehicle_info['timing']['current_duration_hours'],
                 'slot_number': vehicle_info['slot']['number'],
-                'priority': 'high'
+                'priority': 'critical',
+                'overtime_hours': vehicle_info['overtime_hours']
             }
         )
+        logger.info(f"Sent critical long-stay notification to user {booking.user.username}")
     
-    def _notify_admins_summary(self, long_stay_vehicles, warning_vehicles):
-        """Send summary notification to all admins and security personnel"""
+    def _notify_user_warning(self, booking, vehicle_info):
+        """Send warning notification to vehicle owner"""
+        hours_remaining = 24 - vehicle_info['timing']['current_duration_hours']
+        
+        Notification.objects.create(
+            user=booking.user,
+            notification_type='reminder',
+            title='⚡ Parking Duration Warning',
+            message=f"Your vehicle ({vehicle_info['vehicle']['plate']}) has been parked for {vehicle_info['timing']['current_duration_formatted']} at {vehicle_info['slot']['parking_lot']}, Slot {vehicle_info['slot']['number']}. You have approximately {hours_remaining:.1f} hours remaining before the 24-hour limit. Please plan to check out soon.",
+            related_object_id=str(booking.id),
+            related_object_type='Booking',
+            additional_data={
+                'alert_type': 'long_stay_warning',
+                'duration_hours': vehicle_info['timing']['current_duration_hours'],
+                'slot_number': vehicle_info['slot']['number'],
+                'priority': 'medium',
+                'hours_remaining': round(hours_remaining, 1)
+            }
+        )
+        logger.info(f"Sent warning notification to user {booking.user.username}")
+    
+    def _notify_admins_critical(self, booking, vehicle_info):
+        """Send immediate critical alert to all admins for a single long-stay vehicle"""
         admins = User.objects.filter(role__in=['admin', 'security'], is_active=True)
         
-        # Build summary message
+        message = (
+            f"🚨 CRITICAL ALERT\n\n"
+            f"Vehicle: {vehicle_info['vehicle']['plate']} ({vehicle_info['vehicle']['type']})\n"
+            f"Owner: {vehicle_info['user']['username']} ({vehicle_info['user']['email']})\n"
+            f"Location: {vehicle_info['slot']['parking_lot']}\n"
+            f"Slot: {vehicle_info['slot']['number']} (Floor {vehicle_info['slot']['floor']}, Section {vehicle_info['slot']['section']})\n"
+            f"Duration: {vehicle_info['timing']['current_duration_formatted']}\n"
+            f"Overtime: {vehicle_info['overtime_hours']:.1f} hours\n\n"
+            f"⚠️ This vehicle has exceeded the 24-hour parking limit. Immediate action required."
+        )
+        
+        for admin in admins:
+            Notification.objects.create(
+                user=admin,
+                notification_type='system_alert',
+                title=f'🚨 CRITICAL: Long-Stay Vehicle Detected',
+                message=message,
+                related_object_id=str(booking.id),
+                related_object_type='Booking',
+                additional_data={
+                    'alert_type': 'long_stay_critical_admin',
+                    'booking_id': booking.id,
+                    'vehicle_plate': vehicle_info['vehicle']['plate'],
+                    'duration_hours': vehicle_info['timing']['current_duration_hours'],
+                    'slot_number': vehicle_info['slot']['number'],
+                    'priority': 'critical'
+                }
+            )
+        
+        logger.info(f"Sent critical alert to {admins.count()} admin/security users for booking {booking.id}")
+    
+    def _notify_admins_warning(self, booking, vehicle_info):
+        """Send warning alert to admins about vehicle approaching long-stay threshold"""
+        admins = User.objects.filter(role__in=['admin', 'security'], is_active=True)
+        
+        hours_remaining = 24 - vehicle_info['timing']['current_duration_hours']
+        
+        message = (
+            f"⚡ WARNING ALERT\n\n"
+            f"Vehicle: {vehicle_info['vehicle']['plate']} ({vehicle_info['vehicle']['type']})\n"
+            f"Owner: {vehicle_info['user']['username']}\n"
+            f"Slot: {vehicle_info['slot']['number']} - {vehicle_info['slot']['parking_lot']}\n"
+            f"Duration: {vehicle_info['timing']['current_duration_formatted']}\n"
+            f"Est. Time to Limit: {hours_remaining:.1f} hours\n\n"
+            f"This vehicle is approaching the 24-hour parking limit. Monitor for potential long-stay situation."
+        )
+        
+        for admin in admins:
+            Notification.objects.create(
+                user=admin,
+                notification_type='reminder',
+                title=f'⚡ Vehicle Approaching Long-Stay Limit',
+                message=message,
+                related_object_id=str(booking.id),
+                related_object_type='Booking',
+                additional_data={
+                    'alert_type': 'long_stay_warning_admin',
+                    'booking_id': booking.id,
+                    'vehicle_plate': vehicle_info['vehicle']['plate'],
+                    'duration_hours': vehicle_info['timing']['current_duration_hours'],
+                    'slot_number': vehicle_info['slot']['number'],
+                    'priority': 'medium',
+                    'hours_remaining': round(hours_remaining, 1)
+                }
+            )
+        
+        logger.info(f"Sent warning alert to {admins.count()} admin/security users for booking {booking.id}")
+    
+    def _notify_admins_summary(self, long_stay_vehicles, warning_vehicles):
+        """Send comprehensive summary notification to all admins and security personnel"""
+        admins = User.objects.filter(role__in=['admin', 'security'], is_active=True)
+        
+        # Build detailed summary message
         message_parts = []
         
+        # Add header with counts
+        message_parts.append("📊 LONG-STAY VEHICLE DETECTION SUMMARY")
+        message_parts.append("=" * 50)
+        
         if long_stay_vehicles:
-            message_parts.append(f"🚨 {len(long_stay_vehicles)} vehicle(s) exceed 24-hour limit:")
-            for v in long_stay_vehicles[:5]:  # Show first 5
+            message_parts.append(f"\n🚨 CRITICAL: {len(long_stay_vehicles)} vehicle(s) exceed 24-hour limit:")
+            message_parts.append("-" * 50)
+            for idx, v in enumerate(long_stay_vehicles[:5], 1):  # Show first 5
                 message_parts.append(
-                    f"  • {v['vehicle']['plate']} - Slot {v['slot']['number']} - {v['timing']['current_duration_formatted']}"
+                    f"{idx}. {v['vehicle']['plate']} ({v['vehicle']['type']})\n"
+                    f"   Location: Slot {v['slot']['number']} - {v['slot']['parking_lot']}\n"
+                    f"   Duration: {v['timing']['current_duration_formatted']}\n"
+                    f"   Overtime: {v['overtime_hours']:.1f}h\n"
+                    f"   Owner: {v['user']['username']} ({v['user']['email']})"
                 )
             if len(long_stay_vehicles) > 5:
-                message_parts.append(f"  ... and {len(long_stay_vehicles) - 5} more")
+                message_parts.append(f"\n   ... and {len(long_stay_vehicles) - 5} more critical vehicles")
+        else:
+            message_parts.append("\n✅ No critical long-stay vehicles detected")
         
         if warning_vehicles:
-            message_parts.append(f"\n⚡ {len(warning_vehicles)} vehicle(s) approaching limit:")
-            for v in warning_vehicles[:3]:  # Show first 3
+            message_parts.append(f"\n\n⚡ WARNING: {len(warning_vehicles)} vehicle(s) approaching 24-hour limit:")
+            message_parts.append("-" * 50)
+            for idx, v in enumerate(warning_vehicles[:3], 1):  # Show first 3
+                hours_remaining = 24 - v['timing']['current_duration_hours']
                 message_parts.append(
-                    f"  • {v['vehicle']['plate']} - {v['timing']['current_duration_formatted']}"
+                    f"{idx}. {v['vehicle']['plate']} - Slot {v['slot']['number']}\n"
+                    f"   Duration: {v['timing']['current_duration_formatted']} "
+                    f"(~{hours_remaining:.1f}h remaining)"
                 )
+            if len(warning_vehicles) > 3:
+                message_parts.append(f"\n   ... and {len(warning_vehicles) - 3} more warning vehicles")
+        else:
+            message_parts.append("\n\n✅ No vehicles approaching long-stay threshold")
+        
+        # Add footer with action items
+        message_parts.append("\n" + "=" * 50)
+        message_parts.append("⚠️ Action Required:")
+        if long_stay_vehicles:
+            message_parts.append("• Contact vehicle owners immediately")
+            message_parts.append("• Verify vehicles are not abandoned")
+            message_parts.append("• Consider additional charges or towing")
+        if warning_vehicles:
+            message_parts.append("• Monitor warning vehicles closely")
+            message_parts.append("• Prepare for potential long-stay situations")
         
         message = "\n".join(message_parts)
+        
+        # Determine priority and title
+        if long_stay_vehicles:
+            priority = 'critical'
+            title = f'🚨 CRITICAL: Long-Stay Summary ({len(long_stay_vehicles)} vehicles)'
+        elif warning_vehicles:
+            priority = 'medium'
+            title = f'⚡ Long-Stay Warning Summary ({len(warning_vehicles)} vehicles)'
+        else:
+            priority = 'low'
+            title = '✅ Long-Stay Detection - All Clear'
         
         # Create notifications for admins
         for admin in admins:
             Notification.objects.create(
                 user=admin,
                 notification_type='system_alert',
-                title=f'Long-Stay Vehicle Alert ({len(long_stay_vehicles)} critical)',
+                title=title,
                 message=message,
                 additional_data={
                     'alert_type': 'long_stay_summary',
                     'critical_count': len(long_stay_vehicles),
                     'warning_count': len(warning_vehicles),
-                    'priority': 'high'
+                    'priority': priority,
+                    'timestamp': timezone.now().isoformat()
                 }
             )
         
-        logger.info(f"Sent long-stay summary to {admins.count()} admin/security users")
+        logger.info(f"Sent long-stay summary ({priority} priority) to {admins.count()} admin/security users")
 
 
 # Singleton instance

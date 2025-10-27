@@ -324,6 +324,17 @@ class CustomerFinalCheckoutView(APIView):
                     "error": f"Cannot complete checkout. Booking status is {booking.status}."
                 }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Check if overstay payment is required and paid
+        overstay_info = booking.calculate_overstay_fee()
+        if overstay_info.get('has_overstay', False) and overstay_info.get('overstay_amount', 0) > 0:
+            if not booking.overstay_paid:
+                return Response({
+                    "error": "Overstay fee payment required before checkout",
+                    "overstay_amount": overstay_info.get('overstay_amount'),
+                    "overstay_minutes": overstay_info.get('overstay_minutes'),
+                    "hint": "Please pay the overstay fee before completing checkout"
+                }, status=status.HTTP_402_PAYMENT_REQUIRED)
+        
         try:
             with transaction.atomic():
                 # Calculate duration and charges

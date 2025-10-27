@@ -12,6 +12,7 @@ from .views import (
     APIRootView, SlotManagementView, BulkSlotUpdateView,
     CheckInView, CheckOutView, ActiveBookingView,
     NearestParkingView,  # NEW: Import the new view
+    RevenueManagementView, OverstayPaymentView,  # Revenue & Overstay Payment
 )
 from .notification_public_views import PublicNotificationUnreadCountView
 from .receipt_views import GenerateReceiptView
@@ -58,7 +59,8 @@ from .admin_checkin_views import (
     FindPreBookedSlotView,
     AdminCheckInView,
     AdminCheckOutView,
-    SearchBookingView
+    SearchBookingView,
+    CheckOverstayFeeView
 )
 
 # Customer Check-In Views
@@ -99,6 +101,7 @@ urlpatterns = [
     path('admin/checkin/find/', FindPreBookedSlotView.as_view(), name='find-prebooked-slot'),
     path('admin/checkin/', AdminCheckInView.as_view(), name='admin-checkin'),
     path('admin/checkout/', AdminCheckOutView.as_view(), name='admin-checkout'),
+    path('admin/checkout/overstay/', CheckOverstayFeeView.as_view(), name='check-overstay-fee'),
     path('admin/bookings/search/', SearchBookingView.as_view(), name='search-booking'),
     
     # Customer Self Check-In (After Gate Verification)
@@ -231,6 +234,16 @@ urlpatterns = [
     # - GET /api/zone-pricing/active_rates/ - Get all active rates
     # - GET /api/zone-pricing/by_zone/?zone=ZONE_CODE - Get rates by zone
     # - GET /api/zone-pricing/rate_summary/ - Get summary of all rates
+    
+    # ============================================================================
+    # REVENUE MANAGEMENT & OVERSTAY PAYMENT
+    # ============================================================================
+    
+    # Admin: Revenue statistics and reporting
+    path('admin/revenue/', RevenueManagementView.as_view(), name='revenue-management'),
+    
+    # Customer: Pay overstay fees
+    path('customer/overstay/payment/', OverstayPaymentView.as_view(), name='overstay-payment'),
 ]
 
 # Include router URLs

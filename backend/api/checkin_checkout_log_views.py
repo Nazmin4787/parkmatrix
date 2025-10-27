@@ -37,10 +37,10 @@ class CheckInCheckOutLogListView(generics.ListAPIView):
         if user.role not in ['admin', 'security']:
             return AuditLog.objects.none()
         
-        # Base queryset - only successful check-in events (one per booking)
+        # Base queryset - show check-in events (both old and new workflow)
         # This avoids duplicates by showing only the check-in log entry
         queryset = AuditLog.objects.filter(
-            action='check_in_success'
+            Q(action='check_in_success') | Q(action='customer_check_in')
         ).select_related(
             'booking', 
             'user', 

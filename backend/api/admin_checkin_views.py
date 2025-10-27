@@ -291,11 +291,20 @@ class AdminCheckOutView(APIView):
         
         try:
             with transaction.atomic():
+                # Calculate overstay fee before verification
+                overstay_info = booking.calculate_overstay_fee()
+                
                 # Update booking to checkout_verified (NOT checked_out)
                 booking.status = 'checkout_verified'
                 booking.checkout_verified_at = timezone.now()
                 booking.checkout_verified_by = request.user
                 booking.checkout_verification_notes = notes
+                
+                # Store overstay info for later use
+                if overstay_info['has_overstay']:
+                    booking.overtime_minutes = overstay_info['overstay_minutes']
+                    booking.overtime_amount = overstay_info['overstay_amount']
+                
                 booking.save()
                 
                 # DO NOT free the slot yet - customer will do that on final checkout
@@ -313,38 +322,52 @@ class AdminCheckOutView(APIView):
                     additional_data={
                         'vehicle_plate': booking.vehicle.number_plate,
                         'slot_number': booking.slot.slot_number,
-                        'secret_code_verified': True
+                        'secret_code_verified': True,
+                        'overstay_info': overstay_info
                     }
                 )
                 
                 # Send notification to customer
+                notification_message = f'Your checkout has been verified at the exit gate.\n\nPlease confirm your final checkout in the app to complete the process.'
+                
+                if overstay_info['has_overstay']:
+                    notification_message += f'\n\n⚠️ Overstay Fee: ₹{overstay_info["overstay_amount"]:.2f} ({overstay_info["overstay_hours"]} hours)'
+                
                 create_rich_notification(
                     user=booking.user,
                     notification_type='checkout_verified',
                     title='✅ Checkout Verified - Exit Approved',
-                    message=f'Your checkout has been verified at the exit gate.\n\nPlease confirm your final checkout in the app to complete the process.',
+                    message=notification_message,
                     related_object_id=str(booking.id),
                     related_object_type='Booking',
                     additional_data={
                         'booking_id': booking.id,
                         'slot_number': booking.slot.slot_number,
                         'vehicle_plate': booking.vehicle.number_plate,
-                        'verified_at': booking.checkout_verified_at.isoformat()
+                        'verified_at': booking.checkout_verified_at.isoformat(),
+                        'overstay_info': overstay_info
                     }
                 )
                 
                 serialized_booking = BookingSerializer(booking)
                 
-                return Response({
+                response_data = {
                     "message": "Checkout verified successfully! Gate opened. Customer can now confirm final checkout from their app.",
                     "booking": serialized_booking.data,
                     "customer": {
                         "name": booking.user.username,
                         "email": booking.user.email
                     },
+                    "overstay_info": overstay_info,
                     "notification_sent": True,
                     "next_step": "Customer needs to open app and tap 'Confirm Checkout'"
-                }, status=status.HTTP_200_OK)
+                }
+                
+                # Add overstay warning if applicable
+                if overstay_info['has_overstay']:
+                    response_data["overstay_warning"] = f"⚠️ Vehicle has overstayed by {overstay_info['overstay_hours']} hours. Additional fee: ₹{overstay_info['overstay_amount']:.2f}"
+                
+                return Response(response_data, status=status.HTTP_200_OK)
                 
         except Exception as e:
             return Response({
@@ -359,6 +382,61 @@ class AdminCheckOutView(APIView):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class CheckOverstayFeeView(APIView):
+    """
+    Check potential overstay fee before checkout verification.
+    Admin can use this to inform customer about additional charges.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser | IsSecurityUser]
+    
+    def get(self, request):
+        """
+        Calculate overstay fee for a booking at current time
+        """
+        booking_id = request.query_params.get('booking_id')
+        vehicle_plate = request.query_params.get('vehicle_plate')
+        
+        # Find booking
+        booking = None
+        try:
+            if booking_id:
+                booking = Booking.objects.get(id=booking_id)
+            elif vehicle_plate:
+                booking = Booking.objects.filter(
+                    vehicle__number_plate__iexact=vehicle_plate,
+                    status__in=['checked_in', 'checkout_requested']
+                ).first()
+                
+                if not booking:
+                    return Response({
+                        "error": f"No active booking found for vehicle {vehicle_plate}"
+                    }, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response({
+                    "error": "Either booking_id or vehicle_plate is required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Booking.DoesNotExist:
+            return Response({
+                "error": "Booking not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Calculate overstay fee
+        overstay_info = booking.calculate_overstay_fee()
+        
+        return Response({
+            "booking_id": booking.id,
+            "vehicle_plate": booking.vehicle.number_plate if booking.vehicle else None,
+            "slot_number": booking.slot.slot_number,
+            "customer_name": booking.user.username,
+            "booking_end_time": booking.end_time.isoformat(),
+            "current_time": timezone.now().isoformat(),
+            "total_price": str(booking.total_price),
+            "overstay_info": overstay_info,
+            "message": f"⚠️ Overstay detected: ₹{overstay_info['overstay_amount']:.2f}" if overstay_info['has_overstay'] else "✅ No overstay - within booking time"
+        }, status=status.HTTP_200_OK)
 
 
 class SearchBookingView(APIView):

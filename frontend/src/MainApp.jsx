@@ -22,6 +22,7 @@ import EditSlot from './pages/administration/EditSlot';
 import RateManagement from './pages/administration/RateManagement';
 import RateForm from './pages/administration/RateForm';
 import ZonePricingManagement from './pages/administration/ZonePricingManagement';
+import RevenueManagement from './pages/administration/RevenueManagement';
 import AccessLogs from './pages/admin/AccessLogs';
 import CheckInCheckOutLogs from './pages/administration/CheckInCheckOutLogs';
 import AdminUserHistory from './pages/administration/AdminUserHistory';
@@ -73,6 +74,7 @@ export default function MainApp() {
         <Route path="/admin/rates/new" element={<Guard roles={['admin']}><RateForm /></Guard>} />
         <Route path="/admin/rates/:id/edit" element={<Guard roles={['admin']}><RateForm /></Guard>} />
         <Route path="/admin/zone-pricing" element={<Guard roles={['admin']}><ZonePricingManagement /></Guard>} />
+        <Route path="/admin/revenue" element={<Guard roles={['admin']}><RevenueManagement /></Guard>} />
         {/* REMOVED: View Bookings feature */}
         {/* <Route path="/admin/bookings" element={<Guard roles={['admin']}><AdminListBookings /></Guard>} /> */}
         <Route path="/admin/access-logs" element={<Guard roles={['admin']}><AccessLogs /></Guard>} />

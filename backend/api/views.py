@@ -1730,3 +1730,278 @@ class NearestParkingView(APIView):
                 'message': 'An error occurred while fetching nearest parking locations.',
                 'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =====================================================
+# REVENUE MANAGEMENT & OVERSTAY PAYMENT VIEWS
+# =====================================================
+
+class RevenueManagementView(APIView):
+    """
+    Admin endpoint to retrieve revenue statistics including overstay fees.
+    Supports filtering by date range, zone, and vehicle type.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+    def get(self, request):
+        try:
+            # Get query parameters
+            start_date = request.GET.get('start_date')
+            end_date = request.GET.get('end_date')
+            zone_filter = request.GET.get('zone')
+            vehicle_type_filter = request.GET.get('vehicle_type')
+
+            # Base query - only checked out bookings
+            bookings = Booking.objects.filter(status='checked_out')
+
+            # Apply date filters
+            if start_date:
+                from datetime import datetime
+                try:
+                    start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    bookings = bookings.filter(checked_out_at__gte=start_dt)
+                except ValueError:
+                    pass
+
+            if end_date:
+                from datetime import datetime
+                try:
+                    end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    bookings = bookings.filter(checked_out_at__lte=end_dt)
+                except ValueError:
+                    pass
+
+            # Apply zone filter
+            if zone_filter:
+                bookings = bookings.filter(slot__parking_zone=zone_filter)
+
+            # Apply vehicle type filter
+            if vehicle_type_filter:
+                bookings = bookings.filter(vehicle__vehicle_type=vehicle_type_filter)
+
+            # Calculate total revenue
+            from django.db.models import Sum
+            
+            total_booking_revenue = bookings.aggregate(
+                total=Sum('total_price')
+            )['total'] or 0
+            
+            total_overstay_revenue = bookings.aggregate(
+                total=Sum('overstay_amount')
+            )['total'] or 0
+            
+            total_revenue = float(total_booking_revenue) + float(total_overstay_revenue)
+
+            # Calculate today's revenue
+            today = timezone.now().date()
+            today_bookings = bookings.filter(checked_out_at__date=today)
+            today_booking_revenue = today_bookings.aggregate(total=Sum('total_price'))['total'] or 0
+            today_overstay_revenue = today_bookings.aggregate(total=Sum('overstay_amount'))['total'] or 0
+            today_revenue = float(today_booking_revenue) + float(today_overstay_revenue)
+
+            # Calculate current month's revenue
+            current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            month_bookings = bookings.filter(checked_out_at__gte=current_month)
+            month_booking_revenue = month_bookings.aggregate(total=Sum('total_price'))['total'] or 0
+            month_overstay_revenue = month_bookings.aggregate(total=Sum('overstay_amount'))['total'] or 0
+            month_revenue = float(month_booking_revenue) + float(month_overstay_revenue)
+
+            # Calculate percentage growth (month over previous month)
+            from datetime import timedelta
+            # Get first day of previous month
+            if current_month.month == 1:
+                prev_month_start = current_month.replace(year=current_month.year - 1, month=12)
+            else:
+                prev_month_start = current_month.replace(month=current_month.month - 1)
+            prev_month_bookings = Booking.objects.filter(
+                status='checked_out',
+                checked_out_at__gte=prev_month_start,
+                checked_out_at__lt=current_month
+            )
+            prev_month_booking_revenue = prev_month_bookings.aggregate(total=Sum('total_price'))['total'] or 0
+            prev_month_overstay_revenue = prev_month_bookings.aggregate(total=Sum('overstay_amount'))['total'] or 0
+            prev_month_revenue = float(prev_month_booking_revenue) + float(prev_month_overstay_revenue)
+            
+            percentage = 0
+            if prev_month_revenue > 0:
+                percentage = ((month_revenue - prev_month_revenue) / prev_month_revenue) * 100
+
+            # Revenue by zone
+            zone_stats = bookings.values('slot__parking_zone').annotate(
+                bookings_count=Count('id'),
+                zone_booking_revenue=Sum('total_price'),
+                zone_overstay_revenue=Sum('overstay_amount')
+            ).order_by('-zone_booking_revenue')
+
+            by_zone = []
+            for stat in zone_stats:
+                zone_name = stat['slot__parking_zone']
+                # Get zone display name
+                zone_display = dict(ParkingSlot.PARKING_ZONE_CHOICES).get(zone_name, zone_name)
+                
+                booking_rev = float(stat['zone_booking_revenue'] or 0)
+                overstay_rev = float(stat['zone_overstay_revenue'] or 0)
+                
+                by_zone.append({
+                    'zone': zone_display,
+                    'revenue': booking_rev + overstay_rev,
+                    'bookings': stat['bookings_count'],
+                    'overstay': overstay_rev
+                })
+
+            # Revenue by vehicle type
+            vehicle_stats = bookings.values('vehicle__vehicle_type').annotate(
+                vehicle_count=Count('id'),
+                vehicle_booking_revenue=Sum('total_price'),
+                vehicle_overstay_revenue=Sum('overstay_amount')
+            ).order_by('-vehicle_booking_revenue')
+
+            by_vehicle_type = []
+            for stat in vehicle_stats:
+                vehicle_type = stat['vehicle__vehicle_type'] or 'Unknown'
+                booking_rev = float(stat['vehicle_booking_revenue'] or 0)
+                overstay_rev = float(stat['vehicle_overstay_revenue'] or 0)
+                
+                by_vehicle_type.append({
+                    'vehicle_type': vehicle_type.title(),
+                    'revenue': booking_rev + overstay_rev,
+                    'count': stat['vehicle_count']
+                })
+
+            # Recent transactions (last 20)
+            recent = bookings.select_related('vehicle', 'slot').order_by('-checked_out_at')[:20]
+            recent_transactions = []
+            
+            for booking in recent:
+                zone_name = booking.slot.parking_zone if booking.slot else 'Unknown'
+                zone_display = dict(ParkingSlot.PARKING_ZONE_CHOICES).get(zone_name, zone_name)
+                
+                booking_amount = float(booking.total_price or 0)
+                overstay_fee = float(booking.overstay_amount or 0)
+                
+                recent_transactions.append({
+                    'id': booking.id,
+                    'vehicle': booking.vehicle.number_plate if booking.vehicle else 'N/A',
+                    'zone': zone_display,
+                    'amount': booking_amount,
+                    'overstay': overstay_fee,
+                    'total': booking_amount + overstay_fee,
+                    'date': booking.checked_out_at.strftime('%Y-%m-%d %H:%M:%S') if booking.checked_out_at else ''
+                })
+
+            # Build response
+            response_data = {
+                'total_revenue': round(total_revenue, 2),
+                'booking_revenue': round(float(total_booking_revenue), 2),
+                'overstay_revenue': round(float(total_overstay_revenue), 2),
+                'today_revenue': round(today_revenue, 2),
+                'month_revenue': round(month_revenue, 2),
+                'percentage': round(percentage, 2),
+                'by_zone': by_zone,
+                'by_vehicle_type': by_vehicle_type,
+                'recent_transactions': recent_transactions
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'error': 'Failed to retrieve revenue data',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class OverstayPaymentView(APIView):
+    """
+    Customer endpoint to record overstay fee payment.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCustomerUser]
+
+    def post(self, request):
+        try:
+            booking_id = request.data.get('booking_id')
+            overstay_amount = request.data.get('overstay_amount')
+            payment_method = request.data.get('payment_method', 'card')
+
+            # Validate input
+            if not booking_id:
+                return Response({
+                    'success': False,
+                    'error': 'Booking ID is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if not overstay_amount:
+                return Response({
+                    'success': False,
+                    'error': 'Overstay amount is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get booking
+            try:
+                booking = Booking.objects.get(id=booking_id, user=request.user)
+            except Booking.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'error': 'Booking not found or does not belong to you'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Validate booking status
+            if booking.status not in ['checkout_verified', 'checkout_requested']:
+                return Response({
+                    'success': False,
+                    'error': 'Payment can only be made after checkout verification'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check if already paid
+            if booking.overstay_paid:
+                return Response({
+                    'success': False,
+                    'error': 'Overstay fee has already been paid'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Calculate actual overstay
+            overstay_info = booking.calculate_overstay_fee()
+            calculated_amount = overstay_info.get('overstay_amount', 0)
+
+            # Validate amount (allow small floating point differences)
+            if abs(float(overstay_amount) - float(calculated_amount)) > 0.01:
+                return Response({
+                    'success': False,
+                    'error': f'Invalid overstay amount. Expected: ${calculated_amount:.2f}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Record payment
+            booking.overstay_amount = calculated_amount
+            booking.overstay_paid = True
+            booking.overstay_paid_at = timezone.now()
+            booking.overstay_payment_method = payment_method
+            booking.save()
+
+            # Create notification
+            create_rich_notification(
+                user=request.user,
+                title='Overstay Fee Paid',
+                message=f'Overstay fee of ${calculated_amount:.2f} paid successfully for booking #{booking.id}',
+                notification_type='payment',
+                related_booking=booking
+            )
+
+            return Response({
+                'success': True,
+                'message': 'Overstay fee payment recorded successfully',
+                'booking_id': booking.id,
+                'amount_paid': float(calculated_amount),
+                'payment_date': booking.overstay_paid_at.isoformat()
+            }, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response({
+                'success': False,
+                'error': 'Invalid amount format'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': 'Failed to process payment',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -140,6 +140,14 @@ export default function AdminDashboard() {
       <div className="dashboard-section">
         <h3 className="section-title">📊 Logs & Reports</h3>
         <div className="admin-actions-grid reports-grid">
+          <Link className="action-card action-outline" to="/admin/revenue">
+            <div className="action-icon">💰</div>
+            <div className="action-content">
+              <div className="action-title">Revenue Management</div>
+              <div className="action-desc">Track earnings & overstay fees</div>
+            </div>
+          </Link>
+
           <Link className="action-card action-outline" to="/admin/access-logs">
             <div className="action-icon">📋</div>
             <div className="action-content">

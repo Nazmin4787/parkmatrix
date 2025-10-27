@@ -110,6 +110,56 @@ export default function MyParking() {
     alert('Secret code copied to clipboard!');
   }
 
+  function calculateOverstay(booking) {
+    if (!booking || !booking.end_time) {
+      console.log('No booking or end_time', { booking });
+      return null;
+    }
+    
+    const endTime = new Date(booking.end_time);
+    const now = new Date();
+    
+    console.log('Overstay check:', {
+      endTime: endTime.toISOString(),
+      now: now.toISOString(),
+      isOverstay: now > endTime,
+      diffMinutes: Math.floor((now - endTime) / (1000 * 60))
+    });
+    
+    // Check if current time exceeds booking end time
+    if (now > endTime) {
+      const overstayMs = now - endTime;
+      const overstayMinutes = Math.floor(overstayMs / (1000 * 60));
+      const overstayHours = (overstayMinutes / 60).toFixed(2);
+      
+      // Calculate overstay amount (assuming hourly rate from slot's parking lot)
+      // For now, use a default rate if not available
+      const hourlyRate = booking.slot?.parking_lot?.hourly_rate || 10;
+      const overstayAmount = (overstayMinutes / 60) * hourlyRate;
+      
+      console.log('Overstay detected:', {
+        overstayMinutes,
+        overstayHours,
+        hourlyRate,
+        overstayAmount
+      });
+      
+      return {
+        has_overstay: true,
+        overstay_minutes: overstayMinutes,
+        overstay_hours: parseFloat(overstayHours),
+        overstay_amount: overstayAmount
+      };
+    }
+    
+    return {
+      has_overstay: false,
+      overstay_minutes: 0,
+      overstay_hours: 0,
+      overstay_amount: 0
+    };
+  }
+
   if (loading) {
     return (
       <div className="my-parking-page">
@@ -250,6 +300,56 @@ export default function MyParking() {
                 ₹{currentBooking.total_price || '0.00'}
               </span>
             </div>
+
+            {/* Overstay Fee Display */}
+            {(() => {
+              console.log('Current booking status:', currentBooking.status);
+              const overstayInfo = calculateOverstay(currentBooking);
+              console.log('Overstay info result:', overstayInfo);
+              
+              if (currentBooking.status === 'checked_in' && overstayInfo && overstayInfo.has_overstay) {
+                return (
+                  <div className="info-item">
+                    <span className="info-label">
+                      Overstay Fee <span style={{ color: '#F59E0B', fontWeight: 'bold' }}>(Pending)</span>
+                    </span>
+                    <span className="info-value" style={{ color: '#DC2626', fontWeight: 'bold' }}>
+                      ₹{overstayInfo.overstay_amount.toFixed(2)}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Overstay Warning */}
+            {currentBooking.status === 'checked_in' && (() => {
+              const overstayInfo = calculateOverstay(currentBooking);
+              if (overstayInfo && overstayInfo.has_overstay) {
+                return (
+                  <div className="info-item overstay-warning" style={{
+                    background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                    padding: '1rem',
+                    borderRadius: '8px',
+                    border: '2px solid #F59E0B',
+                    marginTop: '1rem',
+                    gridColumn: '1 / -1'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                      <span style={{ fontWeight: 'bold', color: '#92400E' }}>Overstay Detected</span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: '#78350F', marginBottom: '0.5rem' }}>
+                      You have exceeded your booking time by <strong>{overstayInfo.overstay_hours} hours</strong> ({overstayInfo.overstay_minutes} minutes)
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#78350F', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                      💡 Please request checkout to avoid further charges
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
 
