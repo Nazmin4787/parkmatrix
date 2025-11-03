@@ -75,7 +75,7 @@ class CustomerCheckInView(APIView):
             if current_occupant:
                 return Response({
                     "error": f"Slot {booking.slot.slot_number} is already occupied by another booking. Please contact support.",
-                    "support_contact": "admin@parksmart.com"
+                    "support_contact": "admin@parkmatrix.com"
                 }, status=status.HTTP_400_BAD_REQUEST)
             else:
                 # Slot marked as occupied but no active booking - free it

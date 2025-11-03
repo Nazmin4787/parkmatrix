@@ -91,7 +91,7 @@ export default function BookingTicket({ booking }) {
     
     // Simple download as text file (you can enhance this to PDF later)
     const ticketContent = `
-PARKSMART BOOKING TICKET
+PARKMATRIX BOOKING TICKET
 ========================
 
 Booking Reference: ${generateBookingReference()}
@@ -143,7 +143,7 @@ Generated on: ${new Date().toLocaleString()}
     <div className="booking-ticket">
       <div className="ticket-header">
         <div className="logo-section">
-          <h1>🅿️ ParkSmart</h1>
+          <h1>🅿️ ParkMatrix</h1>
           <p className="tagline">Smart Parking Solutions</p>
         </div>
         <div className="ticket-id">

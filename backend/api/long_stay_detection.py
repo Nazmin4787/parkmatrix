@@ -65,7 +65,7 @@ class LongStayDetectionService:
                     'number': booking.slot.slot_number,
                     'floor': booking.slot.floor,
                     'section': booking.slot.section,
-                    'parking_lot': booking.slot.parking_lot.name if booking.slot.parking_lot else 'Unknown',
+                    'parking_lot': self._get_parking_location(booking.slot),
                 },
                 'timing': {
                     'checked_in_at': booking.checked_in_at,
@@ -131,6 +131,24 @@ class LongStayDetectionService:
             parts.append(f"{minutes}m")
         
         return " ".join(parts)
+    
+    def _get_parking_location(self, slot):
+        """Get parking location name from slot with proper fallback"""
+        if not slot:
+            return 'Unknown'
+        
+        # Try parking_lot name first
+        if hasattr(slot, 'parking_lot') and slot.parking_lot:
+            return slot.parking_lot.name
+        
+        # Try parking_zone with display name
+        if hasattr(slot, 'parking_zone') and slot.parking_zone:
+            # Get display name from PARKING_ZONE_CHOICES if available
+            from .models import ParkingSlot
+            zone_choices_dict = dict(ParkingSlot.PARKING_ZONE_CHOICES)
+            return zone_choices_dict.get(slot.parking_zone, slot.parking_zone.replace('_', ' ').title())
+        
+        return 'Unknown'
     
     def _handle_long_stay_vehicle(self, booking, vehicle_info):
         """Handle a vehicle that has exceeded the long-stay threshold"""

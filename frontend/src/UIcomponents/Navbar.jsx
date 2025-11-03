@@ -22,7 +22,7 @@ export default function Navbar() {
       <div className="navbar-inner">
         <Link to="/" className="brand">
           <span className="brand-mark">🅿️</span>
-          <span className="brand-name">ParkSmart</span>
+          <span className="brand-name">ParkMatrix</span>
         </Link>
 
         <nav className="nav-links">
